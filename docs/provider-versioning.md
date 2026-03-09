@@ -376,3 +376,19 @@ This project demonstrates good practices:
 - ✅ Assume role pattern for resource access
 
 See `docs/zadatak1/zadatak1.md` for the complete IAM security model.
+
+---
+
+## Further Reading
+
+- [Terraform Provider Versioning](https://developer.hashicorp.com/terraform/language/providers/requirements)
+- [Dependency Lock File](https://developer.hashicorp.com/terraform/language/files/dependency-lock)
+- [AWS Provider Changelog](https://github.com/hashicorp/terraform-provider-aws/blob/main/CHANGELOG.md)
+
+---
+
+**Related Project Documentation:**
+
+- `docs/zadatak1/zadatak1.md` - IAM setup and security model
+- `versions.tf` - Current provider configuration
+- `.terraform.lock.hcl` - Current locked versions
