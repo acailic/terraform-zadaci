@@ -337,4 +337,42 @@ terraform plan
 
 ## 6. Best Practices Checklist
 
-<!-- TODO -->
+### Version Constraints
+
+- [ ] Always specify `version` in `required_providers`
+- [ ] Use `~>` for flexible but safe versioning
+- [ ] Pin to exact version (`=`) for critical production environments
+- [ ] Never leave version unconstrained
+- [ ] Review changelogs before major version upgrades
+
+### Lock File Management
+
+- [ ] Commit `.terraform.lock.hcl` to git
+- [ ] Run `terraform init -upgrade` in a branch first
+- [ ] Review lock file changes before committing
+- [ ] Keep lock file in sync across team
+
+### Upgrade Process
+
+- [ ] Test upgrades in development environment first
+- [ ] Run `terraform plan` after upgrade and review output
+- [ ] Check for deprecation warnings
+- [ ] Have rollback plan ready
+- [ ] Document upgrade in commit message
+
+### Security
+
+- [ ] Verify provider checksums (automatic with lock file)
+- [ ] Use official providers from Terraform Registry when possible
+- [ ] Keep providers updated for security patches
+- [ ] Use minimal required permissions (as in this project's IAM setup)
+
+### From This Project's Setup
+
+This project demonstrates good practices:
+- ✅ Version constraint specified (`~> 6.0`)
+- ✅ Lock file committed to git
+- ✅ Minimal IAM permissions for terraform-user
+- ✅ Assume role pattern for resource access
+
+See `docs/zadatak1/zadatak1.md` for the complete IAM security model.
