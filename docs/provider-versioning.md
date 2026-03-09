@@ -15,7 +15,27 @@
 
 ## 1. Why Provider Versioning Matters
 
-<!-- TODO -->
+Provider versioning is critical for maintaining stable, predictable infrastructure.
+
+### Why It Matters
+
+1. **Infrastructure Stability** - Pinning versions ensures your Terraform runs behave consistently across environments and over time.
+
+2. **Breaking Changes** - Providers introduce breaking changes as they evolve. Without version constraints, `terraform init` may auto-upgrade to an incompatible version, causing unexpected failures.
+
+3. **Security Updates** - Version constraints allow you to control when to adopt security patches, giving you time to test before deployment.
+
+4. **Team Coordination** - Explicit versions ensure all team members work with the same provider versions, preventing "works on my machine" issues.
+
+### Real-World Impact
+
+```
+# Without version constraint → surprises!
+terraform init
+# Upgrading: aws ~> 4.0 → 5.0 (breaking changes!)
+terraform apply
+# Error: resource argument renamed
+```
 
 ## 2. Version Constraint Syntax
 
