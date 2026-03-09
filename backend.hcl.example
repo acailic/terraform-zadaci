@@ -1,0 +1,4 @@
+bucket  = "terraform-state-bucket-uddspring"
+key     = "terraform-zadaci/root.tfstate"
+region  = "us-east-1"
+profile = "terraform"
