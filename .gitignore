@@ -10,3 +10,26 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+
+# Plan output files (may contain sensitive data)
+*.tfplan
+*.plan
+
+# Environment variable files
+.env
+.env.*
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+
+# macOS metadata
+.DS_Store
+**/.DS_Store
+
+# IDE / editor files
+.idea/
+*.iml
+.vscode/
