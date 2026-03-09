@@ -87,7 +87,64 @@ This configuration allows any AWS provider 6.x.x version (6.0.0 through 6.999.x)
 
 ## 3. Dependency Lock File (.terraform.lock.hcl)
 
-<!-- TODO -->
+The `.terraform.lock.hcl` file records the exact provider versions selected for your workspace.
+
+### Purpose
+
+- **Deterministic** - Ensures `terraform init` selects the same versions every time
+- **Team sync** - When committed to git, all team members use identical provider versions
+- **Audit trail** - Shows exactly which versions are deployed
+
+### Lock File Structure
+
+From this project's `.terraform.lock.hcl`:
+
+```hcl
+# This file is maintained by Terraform and should not be edited manually
+provider "registry.terraform.io/hashicorp/aws" {
+  version     = "6.35.1"
+  constraints = "~> 6.0"
+  hashes = [
+    "h1:xD+5zPhF0ry3sutriARfFVIg5m38VwYt66RveI3aUyI=",
+    "zh:0a16d1b0ba9379e5c5295e6b3caa42f0b8ba6b9f0a7cc9dbe58c232cf995db2d",
+  ]
+}
+```
+
+Key fields:
+- `version` - Exact version Terraform selected
+- `constraints` - Version constraint from versions.tf
+- `hashes` - Security checksums for integrity verification
+
+### When to Commit to Git
+
+**YES - Commit the lock file when:**
+- Working in a team (ensures everyone uses same versions)
+- Using CI/CD (reproduces same environment)
+- Following Terraform best practices
+
+**MAYBE - Skip commit when:**
+- Local development only (rare)
+- Multiple developer environments with intentionally different versions
+
+### How Terraform Uses It
+
+```
+$ terraform init
+- Reading lock file: .terraform.lock.hcl
+- Found existing lock file with aws 6.35.1
+- Constraint: ~> 6.0 → 6.35.1 is valid
+- Using locked version
+```
+
+When running `terraform init -upgrade`, Terraform:
+1. Checks for newer versions matching constraints
+2. Updates `.terraform.lock.hcl` if new version found
+3. Shows upgrade summary
+
+### Security
+
+The `hashes` array contains SHA256 checksums. Terraform verifies these after downloading providers to ensure integrity and authenticity.
 
 ## 4. Provider Configuration
 
