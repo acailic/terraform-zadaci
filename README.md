@@ -31,3 +31,8 @@ The S3 backend needs:
 - `s3:ListBucket` on the backend bucket
 - `s3:GetObject` and `s3:PutObject` on the state object
 - `s3:GetObject`, `s3:PutObject`, and `s3:DeleteObject` on the `.tflock` object when `use_lockfile = true`
+
+## Documentation
+
+- **[Provider Versioning Guide](docs/provider-versioning.md)** - Comprehensive reference for Terraform provider version management
+- [Zadatak 1 - IAM Setup](docs/zadatak1/zadatak1.md) - IAM user, role, and S3 backend configuration
