@@ -259,7 +259,81 @@ This allows the terraform-user to assume TerraformAdminRole for resource managem
 
 ## 5. Upgrade Workflows
 
-<!-- TODO -->
+Upgrading providers requires careful planning to avoid breaking changes.
+
+### Standard Upgrade
+
+```bash
+# 1. Check for available upgrades
+terraform init -upgrade
+
+# Output:
+# - Upgrading hashicorp/aws from 6.35.1 to 6.50.0
+# - .terraform.lock.hcl has been updated
+
+# 2. Review the upgrade
+cat .terraform.lock.hcl
+
+# 3. Plan to see changes
+terraform plan
+
+# 4. If good, commit the lock file
+git add .terraform.lock.hcl
+git commit -m "chore: upgrade aws provider to 6.50.0"
+```
+
+### Safe Upgrade Workflow
+
+For major version upgrades:
+
+```bash
+# 1. Read provider changelog
+# Visit: https://github.com/hashicorp/terraform-provider-aws/blob/main/CHANGELOG.md
+
+# 2. Test in a branch
+git checkout -b upgrade-provider-v7
+
+# 3. Update constraint in versions.tf
+# Change: version = "~> 6.0"
+# To:     version = "~> 7.0"
+
+# 4. Upgrade and plan
+terraform init -upgrade
+terraform plan
+
+# 5. Look for deprecation warnings and breaking changes
+terraform plan 2>&1 | grep -i warning
+
+# 6. Apply if safe
+terraform apply
+
+# 7. Commit both versions.tf and lock file
+git add versions.tf .terraform.lock.hcl
+git commit -m "chore: upgrade aws provider to v7"
+```
+
+### Rollback Strategy
+
+If an upgrade breaks your infrastructure:
+
+```bash
+# 1. Revert both files
+git checkout HEAD~1 -- versions.tf .terraform.lock.hcl
+
+# 2. Re-initialize with old versions
+rm -rf .terraform
+terraform init
+
+# 3. Verify
+terraform plan
+# Should show no provider-related changes
+```
+
+### Testing Before Production
+
+- **Dev environment first** - Always test upgrades in non-production
+- **terraform plan output** - Review all changes before apply
+- **check mode** - Use `terraform apply -target=resource` for specific testing
 
 ## 6. Best Practices Checklist
 
