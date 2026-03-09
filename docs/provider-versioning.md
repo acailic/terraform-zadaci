@@ -148,7 +148,114 @@ The `hashes` array contains SHA256 checksums. Terraform verifies these after dow
 
 ## 4. Provider Configuration
 
-<!-- TODO -->
+The `required_providers` block defines which providers your configuration needs and where to find them.
+
+### Basic Configuration
+
+```hcl
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+```
+
+### Provider Source Format
+
+`source = "[HOSTNAME]/NAMESPACE/NAME"`
+
+| Source | Registry | Example |
+|--------|----------|---------|
+| `hashicorp/aws` | Terraform Registry (default) | Official AWS provider |
+| `hashicorp/azurerm` | Terraform Registry | Official Azure provider |
+| `integrations/github` | Terraform Registry | GitHub provider |
+| `custom.corp/custom` | Private registry | Custom internal provider |
+
+### version_constraint vs version Argument
+
+**In `required_providers` block (versions.tf):**
+
+```hcl
+required_providers {
+  aws = {
+    version = "~> 5.0"  # ← CONSTRAINT: acceptable versions
+  }
+}
+```
+
+**In `provider` block (provider.tf):**
+
+```hcl
+provider "aws" {
+  version = "5.76.0"    # ← DEPRECATED: use required_providers instead
+  region  = var.aws_region
+}
+```
+
+⚠️ **The `version` argument in provider blocks is deprecated.** Always specify versions in `required_providers`.
+
+### Multiple Provider Instances (alias)
+
+Use `alias` for multiple configurations of the same provider:
+
+```hcl
+provider "aws" {
+  region  = "us-east-1"
+  alias   = "east"
+}
+
+provider "aws" {
+  region  = "eu-west-1"
+  alias   = "west"
+}
+
+resource "aws_s3_bucket" "primary" {
+  provider = aws.east
+  # ...
+}
+
+resource "aws_s3_bucket" "replica" {
+  provider = aws.west
+  # ...
+}
+```
+
+### From This Project
+
+`versions.tf` specifies the constraint:
+
+```hcl
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 6.0"
+    }
+  }
+}
+```
+
+`provider.tf` uses `assume_role` for secure access:
+
+```hcl
+provider "aws" {
+  region  = var.aws_region
+
+  assume_role {
+    role_arn     = var.assume_role_arn
+    session_name = "terraform-session"
+  }
+
+  default_tags {
+    tags = var.default_tags
+  }
+}
+```
+
+This allows the terraform-user to assume TerraformAdminRole for resource management.
 
 ## 5. Upgrade Workflows
 
