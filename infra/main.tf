@@ -1,19 +1,15 @@
 # =============================================================================
-# ZADATAK 1 – Test resources
+# Infra – Application resources managed via TerraformAdminRole
 #
-# These prove that assume-role works: terraform-user has NO direct EC2/VPC/S3
-# permissions — everything below is created via TerraformAdminRole.
-#
-# IMPORTANT: depends_on ensures the IAM role + policies are destroyed AFTER
-# these resources; otherwise Terraform loses assume-role access mid-destroy.
+# This stack assumes the role created by bootstrap/ and provisions
+# VPC, subnet, EC2, and a test S3 bucket.
 # =============================================================================
 
-# ----- Test S3 bucket (resource, NOT the state backend) ----------------------
+# ----- Test S3 bucket --------------------------------------------------------
 
 resource "aws_s3_bucket" "test" {
   bucket        = "${local.name_prefix}-test-bucket"
-  force_destroy = true # easy cleanup for learning
-  depends_on    = [aws_iam_role_policy_attachment.admin]
+  force_destroy = true
 
   tags = { Name = "${local.name_prefix}-test-bucket" }
 }
@@ -38,13 +34,12 @@ resource "aws_s3_bucket_public_access_block" "test" {
   restrict_public_buckets = true
 }
 
-# ----- Test VPC + Subnet ----------------------------------------------------
+# ----- VPC + Subnet ---------------------------------------------------------
 
 resource "aws_vpc" "test" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_support   = true
   enable_dns_hostnames = true
-  depends_on           = [aws_iam_role_policy_attachment.admin]
 
   tags = { Name = "${local.name_prefix}-vpc" }
 }
@@ -57,7 +52,7 @@ resource "aws_subnet" "test" {
   tags = { Name = "${local.name_prefix}-subnet" }
 }
 
-# ----- Test EC2 instance -----------------------------------------------------
+# ----- EC2 instance ---------------------------------------------------------
 
 data "aws_ami" "amazon_linux" {
   most_recent = true

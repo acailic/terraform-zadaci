@@ -1,28 +1,25 @@
 # =============================================================================
-# ZADATAK 1 – IAM setup
+# Bootstrap – IAM resources needed before Terraform can manage infrastructure
 #
-# Security model:
-#   terraform-user  ─── credentials ───> S3 backend (state)
-#                   ─── sts:AssumeRole ──> TerraformAdminRole ──> all resources
+# Creates:
+#   1. terraform-user  (programmatic IAM user)
+#   2. TerraformAdminRole  (assume-role target for all infra work)
+#   3. Policies: backend access, assume-role, admin permissions on the role
 #
-# The user NEVER touches resources directly. All infra goes through the role.
-#
-# BOOTSTRAP NOTE: The user + role are protected with prevent_destroy because
-# Terraform NEEDS them to function. If you destroy them, Terraform can no
-# longer assume the role and you're locked out.
-# To tear down everything: first `terraform destroy` test resources, then
-# delete the IAM user + role manually in the AWS console.
+# This stack should rarely change. Use lifecycle { prevent_destroy } on
+# critical resources so they are not accidentally removed.
 # =============================================================================
 
-# ----- 1. IAM User (terraform-user) -----------------------------------------
-# Programmatic-only user. Access key is used via the AWS CLI profile set in var.aws_profile.
+# ----- 1. IAM User ----------------------------------------------------------
 
 resource "aws_iam_user" "terraform" {
   name          = "terraform-user"
   force_destroy = true
   tags          = { Name = "terraform-user" }
 
-  lifecycle { prevent_destroy = true }
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_iam_access_key" "terraform" {
@@ -30,15 +27,15 @@ resource "aws_iam_access_key" "terraform" {
 }
 
 # ----- 2. IAM Role (TerraformAdminRole) -------------------------------------
-# The role that actually manages infrastructure.
-# Trust policy: only terraform-user can assume this role.
 
 resource "aws_iam_role" "terraform_admin" {
   name               = "TerraformAdminRole"
   assume_role_policy = data.aws_iam_policy_document.trust_policy.json
   tags               = { Name = "TerraformAdminRole" }
 
-  lifecycle { prevent_destroy = true }
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 data "aws_iam_policy_document" "trust_policy" {
@@ -51,11 +48,24 @@ data "aws_iam_policy_document" "trust_policy" {
   }
 }
 
-# Permissions policy – WHAT the role can do
+# ----- 3. Role permissions ---------------------------------------------------
+# Scoped to services Terraform actually manages. Expand as needed.
+
 data "aws_iam_policy_document" "admin_permissions" {
   statement {
-    sid       = "ManageInfra"
-    actions   = ["ec2:*", "s3:*", "rds:*", "ecs:*", "eks:*", "cloudwatch:*", "logs:*", "iam:*", "elasticloadbalancing:*", "autoscaling:*"]
+    sid = "ManageInfra"
+    actions = [
+      "ec2:*",
+      "s3:*",
+      "rds:*",
+      "ecs:*",
+      "eks:*",
+      "cloudwatch:*",
+      "logs:*",
+      "iam:*",
+      "elasticloadbalancing:*",
+      "autoscaling:*",
+    ]
     resources = ["*"]
   }
 }
@@ -70,8 +80,7 @@ resource "aws_iam_role_policy_attachment" "admin" {
   policy_arn = aws_iam_policy.admin_permissions.arn
 }
 
-# ----- 3. User policy: S3 backend access (scoped to state bucket only) ------
-# terraform-user needs direct S3 access ONLY for reading/writing state files.
+# ----- 4. User policy: S3 backend access ------------------------------------
 
 data "aws_iam_policy_document" "backend_access" {
   statement {
@@ -96,7 +105,7 @@ resource "aws_iam_user_policy_attachment" "backend" {
   policy_arn = aws_iam_policy.backend_access.arn
 }
 
-# ----- 4. User policy: allow assuming TerraformAdminRole --------------------
+# ----- 5. User policy: allow assuming TerraformAdminRole --------------------
 
 data "aws_iam_policy_document" "assume_role" {
   statement {

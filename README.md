@@ -1,34 +1,51 @@
 # terraform-zadaci
 
-This root module creates a hardened S3 bucket with an S3 backend for state storage.
+Two-root Terraform layout separating **bootstrap** (identity / backend) from **infra** (application resources).
 
-## Usage
+## Repository structure
 
-1. Initialize Terraform:
+```
+bootstrap/          # IAM user, role, trust policy, backend access
+infra/              # VPC, subnet, EC2, test S3 bucket (assumes TerraformAdminRole)
+docs/               # Guides, plans, checklists
+```
+
+The old flat root files (`iam.tf`, `main.tf`, etc.) are kept for reference but are superseded by the two directories above.
+
+## Workflow
+
+### 1. Bootstrap (run once, or when IAM changes)
 
 ```bash
+cd bootstrap
 terraform init
+terraform plan
+terraform apply
 ```
 
-2. Review the plan:
+This creates `terraform-user`, `TerraformAdminRole`, and the associated policies. Critical resources have `prevent_destroy` enabled.
+
+### 2. Infra (day-to-day work)
 
 ```bash
+cd infra
+terraform init
 terraform plan
+terraform apply
 ```
+
+This stack assumes `TerraformAdminRole` and provisions VPC, subnet, EC2, and a test S3 bucket.
+
+### State files
+
+| Stack     | S3 key                              |
+|-----------|-------------------------------------|
+| bootstrap | `terraform-zadaci/bootstrap.tfstate`|
+| infra     | `terraform-zadaci/infra.tfstate`    |
 
 ## Authentication
 
-Use the AWS default credential chain or a shared profile. Do not commit AWS access keys or secrets into the repository.
-
-If you need to assume a role, override `assume_role_arn` via `-var` or a `.tfvars` file, or configure role assumption in your AWS profile.
-
-## Backend permissions
-
-The S3 backend needs:
-
-- `s3:ListBucket` on the backend bucket
-- `s3:GetObject` and `s3:PutObject` on the state object
-- `s3:GetObject`, `s3:PutObject`, and `s3:DeleteObject` on the `.tflock` object when `use_lockfile = true`
+Use the AWS default credential chain or a shared profile (`terraform`). Do not commit AWS access keys or secrets into the repository.
 
 ## Documentation
 

@@ -9,13 +9,14 @@ terraform {
   }
 }
 
+# Infra stack assumes TerraformAdminRole created by bootstrap.
 provider "aws" {
-  region  = "eu-north-1"
+  region  = var.aws_region
   profile = "terraform"
 
   assume_role {
-    role_arn     = "arn:aws:iam::969578072702:role/TerraformAdminRole"
-    session_name = "terraform-session"
+    role_arn     = var.terraform_admin_role_arn
+    session_name = "terraform-infra"
   }
 
   default_tags {
