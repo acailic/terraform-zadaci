@@ -8,13 +8,5 @@ terraform {
     }
   }
 
-  # State is stored in S3. Actual values come from backend.hcl:
-  #   terraform init -backend-config=backend.hcl
-  backend "s3" {
-    bucket       = ""
-    key          = ""
-    region       = ""
-    encrypt      = true
-    use_lockfile = true
-  }
+  
 }

@@ -33,3 +33,5 @@ override.tf.json
 .idea/
 *.iml
 .vscode/
+docs/*
+docs/zadatak1/*

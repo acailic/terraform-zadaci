@@ -1,15 +1,14 @@
 # terraform-zadaci
 
-This root module creates a hardened S3 bucket and uses a partial S3 backend configuration.
+This root module creates a hardened S3 bucket with an S3 backend for state storage.
 
 ## Usage
 
-1. Create a local backend config from `backend.hcl.example`.
-2. Create a local variables file from `terraform.tfvars.example`.
-3. Initialize Terraform:
+1. Create a local variables file from `terraform.tfvars.example`.
+2. Initialize Terraform:
 
 ```bash
-terraform init -backend-config=backend.hcl
+terraform init
 ```
 
 4. Review the plan:
