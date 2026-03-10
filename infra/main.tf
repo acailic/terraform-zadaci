@@ -19,13 +19,6 @@ resource "aws_s3_bucket_versioning" "test" {
   versioning_configuration { status = "Enabled" }
 }
 
-resource "aws_s3_bucket_server_side_encryption_configuration" "test" {
-  bucket = aws_s3_bucket.test.id
-  rule {
-    apply_server_side_encryption_by_default { sse_algorithm = "AES256" }
-  }
-}
-
 resource "aws_s3_bucket_public_access_block" "test" {
   bucket                  = aws_s3_bucket.test.id
   block_public_acls       = true
@@ -38,7 +31,6 @@ resource "aws_s3_bucket_public_access_block" "test" {
 
 resource "aws_vpc" "test" {
   cidr_block           = "10.0.0.0/16"
-  enable_dns_support   = true
   enable_dns_hostnames = true
 
   tags = { Name = "${local.name_prefix}-vpc" }
