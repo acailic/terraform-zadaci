@@ -15,7 +15,7 @@
 # =============================================================================
 
 # ----- 1. IAM User (terraform-user) -----------------------------------------
-# Programmatic-only user. Credentials are in ~/.aws/credentials [terraform].
+# Programmatic-only user. Access key is used via the AWS CLI profile set in var.aws_profile.
 
 resource "aws_iam_user" "terraform" {
   name          = "terraform-user"
@@ -41,7 +41,6 @@ resource "aws_iam_role" "terraform_admin" {
   lifecycle { prevent_destroy = true }
 }
 
-# Trust policy – WHO can assume the role
 data "aws_iam_policy_document" "trust_policy" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -71,7 +70,7 @@ resource "aws_iam_role_policy_attachment" "admin" {
   policy_arn = aws_iam_policy.admin_permissions.arn
 }
 
-# ----- 3. User policy: S3 backend access (hardened, minimal) ----------------
+# ----- 3. User policy: S3 backend access (scoped to state bucket only) ------
 # terraform-user needs direct S3 access ONLY for reading/writing state files.
 
 data "aws_iam_policy_document" "backend_access" {

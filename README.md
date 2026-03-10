@@ -4,14 +4,13 @@ This root module creates a hardened S3 bucket with an S3 backend for state stora
 
 ## Usage
 
-1. Create a local variables file from `terraform.tfvars.example`.
-2. Initialize Terraform:
+1. Initialize Terraform:
 
 ```bash
 terraform init
 ```
 
-4. Review the plan:
+2. Review the plan:
 
 ```bash
 terraform plan
@@ -21,7 +20,7 @@ terraform plan
 
 Use the AWS default credential chain or a shared profile. Do not commit AWS access keys or secrets into the repository.
 
-If you need to assume a role, set `assume_role_arn` in `terraform.tfvars` or configure role assumption in your AWS profile.
+If you need to assume a role, override `assume_role_arn` via `-var` or a `.tfvars` file, or configure role assumption in your AWS profile.
 
 ## Backend permissions
 

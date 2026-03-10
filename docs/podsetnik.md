@@ -1,3 +1,0 @@
-### Zadaci
-
-- istraziiti versionisanje providera
