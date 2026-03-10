@@ -9,11 +9,17 @@ terraform {
   }
 }
 
-# Bootstrap uses the terraform profile directly (IAM user credentials).
-# It does NOT assume a role — it is creating the role.
+# Bootstrap assumes TerraformAdminRole to manage IAM resources.
+# This creates a soft circular dependency (the role manages itself), but
+# prevent_destroy on critical resources prevents accidental lockout.
 provider "aws" {
   region  = var.aws_region
   profile = "terraform"
+
+  assume_role {
+    role_arn     = "arn:aws:iam::969578072702:role/TerraformAdminRole"
+    session_name = "terraform-bootstrap"
+  }
 
   default_tags {
     tags = {
