@@ -1,13 +1,12 @@
 # =============================================================================
-# Bootstrap – IAM resources needed before Terraform can manage infrastructure
+# IAM – Identity resources (previously in bootstrap/)
 #
 # Creates:
 #   1. terraform-user  (programmatic IAM user)
-#   2. TerraformAdminRole  (assume-role target for all infra work)
+#   2. TerraformAdminRole  (assume-role target)
 #   3. Policies: backend access, assume-role, admin permissions on the role
 #
-# This stack should rarely change. Use lifecycle { prevent_destroy } on
-# critical resources so they are not accidentally removed.
+# Critical resources have prevent_destroy so they are not accidentally removed.
 # =============================================================================
 
 # ----- 1. IAM User ----------------------------------------------------------
@@ -49,7 +48,6 @@ data "aws_iam_policy_document" "trust_policy" {
 }
 
 # ----- 3. Role permissions ---------------------------------------------------
-# Scoped to services Terraform actually manages. Expand as needed.
 
 data "aws_iam_policy_document" "admin_permissions" {
   statement {

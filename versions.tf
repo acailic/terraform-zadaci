@@ -9,17 +9,12 @@ terraform {
   }
 }
 
-# Bootstrap uses the terraform profile directly (IAM user credentials).
-# It does NOT assume a role — it is creating the role.
+# Single-root stack — uses the terraform profile directly.
 provider "aws" {
   region  = var.aws_region
   profile = "terraform"
 
   default_tags {
-    tags = {
-      Environment = "bootstrap"
-      ManagedBy   = "Terraform"
-      Project     = var.project_name
-    }
+    tags = local.default_tags
   }
 }
