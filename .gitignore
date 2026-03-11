@@ -28,7 +28,7 @@ override.tf.json
 # macOS metadata
 .DS_Store
 **/.DS_Store
-
+.claude
 # IDE / editor files
 .idea/
 *.iml

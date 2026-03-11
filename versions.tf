@@ -9,14 +9,15 @@ terraform {
   }
 }
 
-# Infra stack assumes TerraformAdminRole created by bootstrap.
+# Single-root stack — authenticates as terraform-user, then assumes
+# TerraformAdminRole for all resource operations.
 provider "aws" {
   region  = var.aws_region
   profile = "terraform"
 
   assume_role {
-    role_arn     = var.terraform_admin_role_arn
-    session_name = "terraform-infra"
+    role_arn     = "arn:aws:iam::969578072702:role/TerraformAdminRole"
+    session_name = "TerraformSession"
   }
 
   default_tags {
