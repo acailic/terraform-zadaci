@@ -16,7 +16,7 @@ provider "aws" {
   profile = "terraform"
 
   assume_role {
-    role_arn     = "arn:aws:iam::969578072702:role/TerraformAdminRole"
+    role_arn     = "arn:aws:iam::${var.aws_account_id}:role/TerraformAdminRole"
     session_name = "TerraformSession"
   }
 

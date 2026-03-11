@@ -8,7 +8,7 @@
 # ----- Test S3 bucket --------------------------------------------------------
 
 resource "aws_s3_bucket" "test" {
-  bucket        = "${local.name_prefix}-test-bucket-1"
+  bucket        = "${local.name_prefix}-test-bucket"
   force_destroy = true
 
   tags = { Name = "${local.name_prefix}-test-bucket" }
@@ -37,7 +37,7 @@ resource "aws_s3_bucket_public_access_block" "test" {
 # ----- VPC + Subnet ---------------------------------------------------------
 
 resource "aws_vpc" "test" {
-  cidr_block           = "10.0.0.0/16"
+  cidr_block           = var.vpc_cidr
   enable_dns_support   = true
   enable_dns_hostnames = true
 
@@ -46,12 +46,13 @@ resource "aws_vpc" "test" {
 
 resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.test.id
-  cidr_block              = "10.0.1.0/24"   # 256 IPs: 10.0.1.0 – 10.0.1.255
+  cidr_block              = var.public_subnet_cidr
   availability_zone       = "${var.aws_region}a"
-  map_public_ip_on_launch = true
+  map_public_ip_on_launch = true ## dodaje public IP na instance u ovom subnetu
 
   tags = { Name = "${local.name_prefix}-public-subnet" }
 }
+## 
 
 # ----- Internet Gateway + Public Route Table --------------------------------
 
@@ -83,18 +84,21 @@ resource "aws_security_group" "web" {
   vpc_id      = aws_vpc.test.id
   description = "Allow HTTP inbound"
 
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+  dynamic "ingress" {
+    for_each = var.ingress_ports
+    content {
+      from_port   = ingress.value
+      to_port     = ingress.value
+      protocol    = "tcp"
+      cidr_blocks = var.allowed_cidr_blocks
+    }
   }
 
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.allowed_egress_cidr_blocks
   }
 
   tags = { Name = "${local.name_prefix}-web-sg" }
@@ -103,10 +107,10 @@ resource "aws_security_group" "web" {
 # ----- EC2 instance ---------------------------------------------------------
 
 resource "aws_instance" "test" {
-  ami                         = var.ami_id
-  instance_type               = var.instance_type
-  subnet_id                   = aws_subnet.public.id
-  vpc_security_group_ids      = [aws_security_group.web.id]
+  ami                    = var.ami_id
+  instance_type          = var.instance_type
+  subnet_id              = aws_subnet.public.id
+  vpc_security_group_ids = [aws_security_group.web.id]
 
   user_data = <<-EOF
     #!/bin/bash
