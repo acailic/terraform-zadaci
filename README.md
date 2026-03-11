@@ -31,6 +31,7 @@ Use the AWS default credential chain or a shared profile (`terraform`). Do not c
 
 ## Documentation
 
+- **[Import Guide](docs/import-guide.md)** - Prerequisites and commands for importing pre-existing IAM resources into state
 - **[Provider Versioning Guide](docs/provider-versioning.md)** - Comprehensive reference for Terraform provider version management
 - [Zadatak 1 - IAM Setup](docs/zadatak1/zadatak1.md) - IAM user, role, and S3 backend configuration
 

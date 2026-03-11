@@ -77,12 +77,36 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
+# ----- Security Group -------------------------------------------------------
+
+resource "aws_security_group" "web" {
+  vpc_id      = aws_vpc.test.id
+  description = "Allow HTTP inbound"
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = { Name = "${local.name_prefix}-web-sg" }
+}
+
 # ----- EC2 instance ---------------------------------------------------------
 
 resource "aws_instance" "test" {
-  ami                    = var.ami_id
-  instance_type          = var.instance_type
-  subnet_id              = aws_subnet.public.id
+  ami                         = var.ami_id
+  instance_type               = var.instance_type
+  subnet_id                   = aws_subnet.public.id
+  vpc_security_group_ids      = [aws_security_group.web.id]
 
   user_data = <<-EOF
     #!/bin/bash
