@@ -32,6 +32,8 @@ output "terraform_access_key_id" {
   value = aws_iam_access_key.terraform.id
 }
 
+
+# Security risk, in s3 state can be viewed
 output "terraform_access_key_secret" {
   description = "Retrieve once after bootstrap, then rotate. Do not store in VCS."
   value       = aws_iam_access_key.terraform.secret

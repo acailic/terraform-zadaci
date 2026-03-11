@@ -22,6 +22,7 @@ variable "state_bucket_name" {
   default     = "terraform-state-bucket-uddspring"
 }
 
+# static AMI ID with a us-east-1-specific note, can be issue
 variable "ami_id" {
   description = "AMI ID for the EC2 instance (Amazon Linux 2023 in us-east-1 by default)."
   type        = string
