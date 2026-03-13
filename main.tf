@@ -187,8 +187,12 @@ resource "aws_key_pair" "main" {
   tags = { Name = "${local.name_prefix}-key" }
 }
 
+resource "random_id" "secret_suffix" {
+  byte_length = 4
+}
+
 resource "aws_secretsmanager_secret" "ssh_private_key" {
-  name                    = "${local.name_prefix}-ssh-private-key"
+  name                    = "${local.name_prefix}-ssh-private-key-${random_id.secret_suffix.hex}"
   description             = "SSH private key for EC2 instance access (managed by Terraform)"
   recovery_window_in_days = 0 # Dev environment — allow immediate deletion on destroy
 
