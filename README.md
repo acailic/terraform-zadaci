@@ -1,15 +1,39 @@
 # terraform-zadaci
 
-Single-root Terraform configuration managing IAM, networking, and application resources.
+Terraform repository with two separate roots:
+
+- `bootstrap/` creates the IAM prerequisites that previously had to be created in the AWS console
+- repository root creates the infrastructure by authenticating as `terraform-user` and assuming `TerraformAdminRole`
 
 ## Repository structure
 
-```
-*.tf                # Terraform configuration (IAM, VPC, subnet, EC2, S3)
+```text
+bootstrap/          # Bootstrap IAM stack
+*.tf                # Main infrastructure stack (VPC, subnet, EC2, S3, SSM)
 docs/               # Guides, plans, checklists
+scripts/            # Helper scripts
 ```
 
 ## Workflow
+
+### 1. Bootstrap IAM
+
+Use direct AWS credentials with IAM permissions. For bootstrap, either pass a
+shared AWS profile explicitly or use temporary admin credentials in the
+environment:
+
+```bash
+terraform -chdir=bootstrap init
+terraform -chdir=bootstrap plan -var='aws_profile=admin'
+terraform -chdir=bootstrap apply -var='aws_profile=admin'
+terraform -chdir=bootstrap output -raw terraform_access_key_id
+terraform -chdir=bootstrap output -raw terraform_access_key_secret
+aws configure --profile terraform
+```
+
+### 2. Main infrastructure
+
+After the local `terraform` AWS profile has a valid access key:
 
 ```bash
 terraform init
@@ -17,24 +41,37 @@ terraform plan
 terraform apply
 ```
 
-This provisions IAM resources (terraform-user, TerraformAdminRole, policies), VPC, public subnet with Internet Gateway, EC2 with user_data, and a test S3 bucket. Critical IAM resources have `prevent_destroy` enabled.
+The `bootstrap/` stack provisions `terraform-user`, `TerraformAdminRole`,
+`TerraformS3BackendPolicy`, and the access key for `terraform-user`. The
+repository root provisions the VPC, subnets, EC2, VPC endpoints, Secrets
+Manager secret, and the test S3 bucket.
 
-### State file
+ 
+## State files
 
-| Stack | S3 key                               |
-|-------|--------------------------------------|
-| infra | `terraform-zadaci/terraform.tfstate` |
+| Stack | State location |
+|-------|----------------|
+| `bootstrap/` | local state by default |
+| repo root | `s3://terraform-state-bucket-uddspring/terraform-zadaci/terraform.tfstate` |
 
 ## Authentication
 
-Use the AWS default credential chain or a shared profile (`terraform`). Do not commit AWS access keys or secrets into the repository.
+- `bootstrap/` does not assume a role; it must run with direct AWS credentials
+  that can create IAM resources.
+- The repo root uses the `terraform` shared profile and assumes
+  `TerraformAdminRole`.
+- Do not commit AWS access keys or secrets into the repository.
 
 ## Documentation
 
-- **[Import Guide](docs/import-guide.md)** - Prerequisites and commands for importing pre-existing IAM resources into state
-- **[Provider Versioning Guide](docs/provider-versioning.md)** - Comprehensive reference for Terraform provider version management
+- [Bootstrap Stack](bootstrap/README.md) - IAM bootstrap workflow
+- [Import Guide](docs/import-guide.md) - Import manually-created IAM resources into the bootstrap stack
+- [Provider Versioning Guide](docs/provider-versioning.md) - Terraform provider version management
 - [Zadatak 1 - IAM Setup](docs/zadatak1/zadatak1.md) - IAM user, role, and S3 backend configuration
-- [Zadatak 2 - EC2 Access](docs/zadatak2/zadatak2.md) - SSH key pair, security group port 22, SSM Session Manager
+- [Zadatak 2 - EC2 Access](docs/zadatak2/zadatak2.md) - SSH key pair, security group, and SSM Session Manager
+
+## Current notes
+
 
 
 #### 
@@ -61,3 +98,6 @@ Use the AWS default credential chain or a shared profile (`terraform`). Do not c
     - [x] uklonjena zavisnost od internet gateway-a za EC2
     - SSM pristup: instance profile (ne root) daje kredencijale SSM Agentu
     - connect: `aws ssm start-session --target <instance-id>`
+
+- random prefix za secret name
+- access key zameniti u aws profile

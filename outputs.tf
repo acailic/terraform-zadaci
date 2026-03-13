@@ -42,25 +42,3 @@ output "vpce_ssm_ids" {
   description = "IDs of the SSM VPC endpoints."
   value       = { for k, v in aws_vpc_endpoint.ssm : k => v.id }
 }
-
-# ----- IAM outputs -----------------------------------------------------------
-
-output "terraform_user_arn" {
-  value = aws_iam_user.terraform.arn
-}
-
-output "terraform_admin_role_arn" {
-  value = aws_iam_role.terraform_admin.arn
-}
-
-output "terraform_access_key_id" {
-  value = aws_iam_access_key.terraform.id
-}
-
-
-# Security risk, in s3 state can be viewed
-output "terraform_access_key_secret" {
-  description = "Retrieve once after bootstrap, then rotate. Do not store in VCS."
-  value       = aws_iam_access_key.terraform.secret
-  sensitive   = true
-}
