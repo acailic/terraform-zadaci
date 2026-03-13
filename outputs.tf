@@ -18,6 +18,14 @@ output "internet_gateway_id" {
   value = aws_internet_gateway.main.id
 }
 
+output "ec2_ssm_role_arn" {
+  value = aws_iam_role.ec2_ssm.arn
+}
+
+output "key_pair_name" {
+  value = aws_key_pair.main.key_name
+}
+
 # ----- IAM outputs -----------------------------------------------------------
 
 output "terraform_user_arn" {

@@ -82,7 +82,7 @@ resource "aws_route_table_association" "public" {
 
 resource "aws_security_group" "web" {
   vpc_id      = aws_vpc.test.id
-  description = "Allow HTTP inbound"
+  description = "Allow HTTP and SSH inbound"
 
   dynamic "ingress" {
     for_each = var.ingress_ports
@@ -104,6 +104,45 @@ resource "aws_security_group" "web" {
   tags = { Name = "${local.name_prefix}-web-sg" }
 }
 
+# ----- SSH Key Pair ---------------------------------------------------------
+## AWS Secret manager storevanje kljuceva je bolja praksa.
+## Rotacija kljuceva je bitna.
+resource "aws_key_pair" "main" {
+  key_name   = "${local.name_prefix}-key"
+  public_key = file(var.ssh_public_key_path)
+
+  tags = { Name = "${local.name_prefix}-key" }
+}
+
+# ----- EC2 SSM Instance Profile ---------------------------------------------
+
+resource "aws_iam_role" "ec2_ssm" {
+  name = "${local.name_prefix}-ec2-ssm-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "ec2.amazonaws.com" }
+    }]
+  })
+
+  tags = { Name = "${local.name_prefix}-ec2-ssm-role" }
+}
+
+resource "aws_iam_role_policy_attachment" "ec2_ssm" {
+  role       = aws_iam_role.ec2_ssm.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "ec2_ssm" {
+  name = "${local.name_prefix}-ec2-ssm-profile"
+  role = aws_iam_role.ec2_ssm.name
+
+  tags = { Name = "${local.name_prefix}-ec2-ssm-profile" }
+}
+
 # ----- EC2 instance ---------------------------------------------------------
 
 resource "aws_instance" "test" {
@@ -111,6 +150,8 @@ resource "aws_instance" "test" {
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.web.id]
+  key_name               = aws_key_pair.main.key_name
+  iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
 
   user_data = <<-EOF
     #!/bin/bash

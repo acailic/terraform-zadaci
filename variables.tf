@@ -43,7 +43,13 @@ variable "public_subnet_cidr" {
 variable "ingress_ports" {
   description = "Ingress ports allowed to reach the web security group."
   type        = list(number)
-  default     = [80]
+  default     = [80, 22]
+}
+
+variable "ssh_public_key_path" {
+  description = "Path to the SSH public key for the EC2 key pair."
+  type        = string
+  default     = "~/.ssh/terraform-zadaci.pub"
 }
 
 variable "allowed_cidr_blocks" {
