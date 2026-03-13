@@ -50,12 +50,14 @@ Use the AWS default credential chain or a shared profile (`terraform`). Do not c
 ###
 - [x] inbound 22 za ssh za ec2 instancu (`ingress_ports = [80, 22]`)
 - [x] ssh key pair (`aws_key_pair.main` + `key_name` na EC2)
-        - [] treba private key u aws secret manager, koji managuje kredencijalima.
-        - treba destroyovati masinu, da bi 
-        - info: rotacija kljuceva je bitna.
+    - [x] private key u AWS Secrets Manager (`aws_secretsmanager_secret.ssh_private_key`)
+        - `tls_private_key` generise ED25519 kljuc, cuva se u Secrets Manager
+        - retrieve: `aws secretsmanager get-secret-value --secret-id terraform-zadaci-dev-ssh-private-key`
+        - info: rotacija kljuceva je bitna — moze se automatizovati sa Lambda
 - [x] SSM Session Manager (`aws_iam_instance_profile.ec2_ssm` sa `AmazonSSMManagedInstanceCore`)
-    -- ukloniti internet gateway i public endpoint, da bi video endpoint.
-    -- private subnet.
-    -- ukloniti ssh point,dodati endpointe private link
-
-    -- proveriti root umesto profile, da li ima pristup ssm-u
+    - [x] uklonjen SSH (port 22) iz security grupe — pristup samo preko SSM
+    - [x] EC2 prebacen u private subnet (`aws_subnet.private`, 10.0.2.0/24)
+    - [x] dodat VPC endpointi (PrivateLink) za SSM: `ssm`, `ssmmessages`, `ec2messages`
+    - [x] uklonjena zavisnost od internet gateway-a za EC2
+    - SSM pristup: instance profile (ne root) daje kredencijale SSM Agentu
+    - connect: `aws ssm start-session --target <instance-id>`

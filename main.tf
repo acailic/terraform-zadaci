@@ -78,6 +78,30 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
+# ----- Private Subnet --------------------------------------------------------
+
+resource "aws_subnet" "private" {
+  vpc_id                  = aws_vpc.test.id
+  cidr_block              = var.private_subnet_cidr
+  availability_zone       = "${var.aws_region}a"
+  map_public_ip_on_launch = false
+
+  tags = { Name = "${local.name_prefix}-private-subnet" }
+}
+
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.test.id
+
+  # No routes — no internet access. VPC endpoints provide AWS service access.
+
+  tags = { Name = "${local.name_prefix}-private-rt" }
+}
+
+resource "aws_route_table_association" "private" {
+  subnet_id      = aws_subnet.private.id
+  route_table_id = aws_route_table.private.id
+}
+
 # ----- Security Group -------------------------------------------------------
 
 resource "aws_security_group" "web" {
@@ -104,14 +128,76 @@ resource "aws_security_group" "web" {
   tags = { Name = "${local.name_prefix}-web-sg" }
 }
 
-# ----- SSH Key Pair ---------------------------------------------------------
-## AWS Secret manager storevanje kljuceva je bolja praksa.
-## Rotacija kljuceva je bitna.
+# ----- VPC Endpoint Security Group -------------------------------------------
+
+resource "aws_security_group" "vpce" {
+  vpc_id      = aws_vpc.test.id
+  description = "Allow HTTPS from VPC CIDR for SSM VPC endpoints"
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = { Name = "${local.name_prefix}-vpce-sg" }
+}
+
+# ----- VPC Endpoints for SSM (PrivateLink) ------------------------------------
+
+resource "aws_vpc_endpoint" "ssm" {
+  for_each = toset([
+    "com.amazonaws.${var.aws_region}.ssm",
+    "com.amazonaws.${var.aws_region}.ssmmessages",
+    "com.amazonaws.${var.aws_region}.ec2messages",
+  ])
+
+  vpc_id              = aws_vpc.test.id
+  service_name        = each.value
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = true
+  subnet_ids          = [aws_subnet.private.id]
+  security_group_ids  = [aws_security_group.vpce.id]
+
+  tags = {
+    Name = "${local.name_prefix}-${split(".", each.value)[length(split(".", each.value)) - 1]}-vpce"
+  }
+}
+
+# ----- TLS Private Key + Secrets Manager -------------------------------------
+# Generise SSH key par u Terraformu. Privatni kljuc se cuva u AWS Secrets Manager.
+# Rotacija kljuceva je bitna — moze se automatizovati sa Lambda funkcijom.
+
+resource "tls_private_key" "main" {
+  algorithm = "ED25519"
+}
+
 resource "aws_key_pair" "main" {
   key_name   = "${local.name_prefix}-key"
-  public_key = file(var.ssh_public_key_path)
+  public_key = tls_private_key.main.public_key_openssh
 
   tags = { Name = "${local.name_prefix}-key" }
+}
+
+resource "aws_secretsmanager_secret" "ssh_private_key" {
+  name                    = "${local.name_prefix}-ssh-private-key"
+  description             = "SSH private key for EC2 instance access (managed by Terraform)"
+  recovery_window_in_days = 0 # Dev environment — allow immediate deletion on destroy
+
+  tags = { Name = "${local.name_prefix}-ssh-private-key" }
+}
+
+resource "aws_secretsmanager_secret_version" "ssh_private_key" {
+  secret_id     = aws_secretsmanager_secret.ssh_private_key.id
+  secret_string = tls_private_key.main.private_key_openssh
 }
 
 # ----- EC2 SSM Instance Profile ---------------------------------------------
@@ -148,11 +234,14 @@ resource "aws_iam_instance_profile" "ec2_ssm" {
 resource "aws_instance" "test" {
   ami                    = var.ami_id
   instance_type          = var.instance_type
-  subnet_id              = aws_subnet.public.id
+  subnet_id              = aws_subnet.private.id
   vpc_security_group_ids = [aws_security_group.web.id]
   key_name               = aws_key_pair.main.key_name
   iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
 
+  # NOTE: user_data yum komande zahtevaju internet. U private subnetu bez NAT-a
+  # nece raditi. SSM Agent je pre-instaliran na Amazon Linux 2023, tako da SSM
+  # i dalje radi. Dodati NAT gateway ili S3 gateway endpoint ako treba yum.
   user_data = <<-EOF
     #!/bin/bash
     set -euo pipefail

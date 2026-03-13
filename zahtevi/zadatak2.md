@@ -2,135 +2,65 @@
 
 ## Cilj
 
-Omoguciti pristup EC2 instanci na dva nacina i razumeti razlike izmedju njih:
-
-1. **SSH** — klasican pristup preko porta 22 sa key pair-om.
-2. **SSM Session Manager** — pristup bez otvorenih portova, preko AWS Systems Manager-a.
-
-Na kraju zadatka, SSH se uklanja u korist SSM-a kao bezbednijeg pristupa.
+Omoguciti pristup EC2 instanci na dva nacina — SSH i SSM Session Manager. Razumeti razlike izmedju njih i zasto se SSM preporucuje za produkciju.
 
 ## Preduslovi
 
-- Zavrsen Zadatak 1 (IAM korisnik, rola, VPC i EC2 vec postoje).
-- Lokalno instaliran `aws` CLI (za `aws ssm start-session`).
+- Zavrsen Zadatak 1 (IAM, VPC, EC2 vec postoje).
 - Instaliran [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) za AWS CLI.
+
+## Kontekst
+
+EC2 instancama se moze pristupiti na vise nacina. **SSH** je klasican pristup koji zahteva otvoren port i kljuc. **SSM Session Manager** je AWS-ov pristup koji koristi IAM autentikaciju i ne zahteva otvorene portove ni public IP adresu.
 
 ## Zahtevi
 
-### 1. SSH Key Pair
+### 1. Omoguciti SSH pristup
 
-- Generisati SSH kljuc (ED25519 algoritam — moderan i bezbedan).
-- Kreirati `aws_key_pair` resurs koji uploada javni kljuc u AWS.
-- Dodeliti `key_name` atribut EC2 instanci.
+- Generisati SSH key pair (ED25519 algoritam).
+- Kreirati Terraform resurs koji uploada javni kljuc u AWS.
+- Dodati EC2 instanci referencu na taj key pair.
+- Otvoriti port 22 u security grupi za inbound pristup.
 
-```bash
-ssh-keygen -t ed25519 -f ~/.ssh/terraform-zadaci -C "terraform-zadaci"
-```
+### 2. Omoguciti SSM Session Manager
 
-> **Vazno:** Promena `key_name` na postojecoj instanci **forsira zamenu** (destroy + create). EC2 ne moze promeniti key pair bez ponovnog kreiranja.
+- Kreirati IAM rolu koju EC2 servis moze da assume-uje.
+- Dodeliti roli AWS managed policy sa minimalnim dozvolama za SSM Agent.
+- Kreirati Instance Profile i dodeliti ga EC2 instanci.
 
-### 2. Security Group — port 22
+> SSM Agent je vec instaliran na Amazon Linux 2023 AMI-ju. Istrazi sta je **Instance Profile** i zasto EC2 ne moze direktno koristiti IAM rolu.
 
-- Dodati port 22 (SSH) u listu `ingress_ports` u security grupi.
-- Koristiti `dynamic "ingress"` blok za iteraciju kroz listu portova.
+### 3. Verifikacija
 
-```hcl
-variable "ingress_ports" {
-  default = [80, 22]   # HTTP + SSH
-}
-```
+- Demonstrirati uspesnu SSH konekciju na instancu.
+- Demonstrirati uspesnu SSM sesiju na instancu.
 
-> **Best practice:** U produkciji, ograniciti `allowed_cidr_blocks` na svoju IP adresu umesto `0.0.0.0/0`:
-> ```bash
-> terraform apply -var='allowed_cidr_blocks=["<tvoja-ip>/32"]'
-> ```
+> `terraform-user` nema direktne SSM dozvole. Razmisli kako da koristis `TerraformAdminRole` iz AWS CLI-ja (hint: AWS profili sa `source_profile` i `role_arn`).
 
-### 3. SSM Session Manager
+### 4. Uklanjanje SSH pristupa
 
-- Kreirati IAM rolu sa Trust Policy za `ec2.amazonaws.com`.
-- Attach-ovati `AmazonSSMManagedInstanceCore` managed policy.
-- Kreirati Instance Profile koji omotava rolu.
-- Dodeliti Instance Profile EC2 instanci.
+Nakon sto SSM radi, ukloniti port 22 iz security grupe. Pristup instanci treba da bude iskljucivo preko SSM-a.
 
-**Lanac dozvola:**
-```text
-EC2 instanca
-  └── Instance Profile: ec2-ssm-profile
-        └── IAM Role: ec2-ssm-role
-              └── Policy: AmazonSSMManagedInstanceCore
-```
+## Isporuka
 
-> **Tip:** SSM Agent je **vec instaliran** na Amazon Linux 2023 AMI-ju. Ne treba ga rucno instalirati.
+- [ ] SSH key pair postoji u AWS-u i referenciran je na EC2 instanci
+- [ ] SSH konekcija na instancu radi
+- [ ] EC2 instanca ima Instance Profile sa SSM dozvolama
+- [ ] SSM sesija na instancu radi (`aws ssm start-session`)
+- [ ] Port 22 je uklonjen iz security grupe (samo SSM pristup ostaje)
 
-### 4. Verifikacija SSH pristupa
+## Napomene
 
-```bash
-ssh -i ~/.ssh/terraform-zadaci ec2-user@$(terraform output -raw test_ec2_public_ip)
-```
-
-- `-i` — putanja do privatnog kljuca.
-- `ec2-user` — default korisnik na Amazon Linux AMI-ju.
-
-### 5. Verifikacija SSM pristupa
-
-Posto `terraform-user` nema direktne SSM dozvole, potrebno je assume-ovati `TerraformAdminRole`. Dodaj profil u `~/.aws/config`:
-
-```ini
-[profile terraform-admin]
-source_profile = terraform
-role_arn = arn:aws:iam::<account-id>:role/TerraformAdminRole
-region = us-east-1
-```
-
-```bash
-aws ssm start-session --profile terraform-admin --target $(terraform output -raw test_ec2_instance_id)
-```
-
-> **Tip:** Ako SSM ne radi odmah, sacekati 2-3 minuta da se SSM Agent registruje.
-
-### 6. Uklanjanje SSH pristupa
-
-Nakon sto SSM radi, ukloniti port 22 iz security grupe:
-
-```hcl
-variable "ingress_ports" {
-  default = [80]   # samo HTTP, bez SSH
-}
-```
-
-Ovo je bezbednosni hardening — pristup instanci je iskljucivo preko SSM-a.
-
-## Novi resursi za kreiranje
-
-| Resurs | Tip | Opis |
-|--------|-----|------|
-| `aws_key_pair.main` | SSH Key Pair | Javni kljuc za EC2 pristup |
-| `aws_iam_role.ec2_ssm` | IAM Role | Trust: `ec2.amazonaws.com` |
-| `aws_iam_role_policy_attachment.ec2_ssm` | Policy Attachment | `AmazonSSMManagedInstanceCore` |
-| `aws_iam_instance_profile.ec2_ssm` | Instance Profile | Omotac za SSM rolu |
-
-## Kljucne razlike SSH vs SSM
-
-| Aspekt | SSH | SSM Session Manager |
-|--------|-----|---------------------|
-| Port | 22 (inbound) | 443 (outbound) |
-| Kljuc | Privatni SSH kljuc | IAM kredencijali |
-| Public IP | Potreban | Nije potreban |
-| Security group | Mora dozvoliti port 22 | Ne treba nikakvo pravilo |
-| Audit log | Lokalni `/var/log/secure` | AWS CloudTrail |
-
-## Saveti
-
-- **Privatni kljuc:** Nikada ne commit-ovati privatni SSH kljuc u git. Dodati `~/.ssh/terraform-zadaci` u `.gitignore`.
-- **SSM je preporucan:** Za produkciju koristiti SSM jer ne zahteva otvorene portove i pruza centralizovan audit log.
-- **Instance Profile != IAM Role:** EC2 ne moze direktno koristiti IAM rolu — mora kroz Instance Profile. U AWS konzoli ovo je skriveno, ali u Terraformu moras eksplicitno kreirati oba resursa.
-- **Stateful firewall:** Security group je stateful — ako dozvolimo inbound na portu 22, odgovor automatski prolazi nazad. Ne treba posebno pravilo za egress.
+- Promena `key_name` na postojecoj instanci forsira **destroy + create** — EC2 ne moze promeniti key pair bez ponovnog kreiranja.
+- Port 22 otvoren na `0.0.0.0/0` je prihvatljivo za dev. U produkciji ograniciti na specificnu IP adresu.
+- Privatni SSH kljuc se nikada ne commit-uje u git.
+- Security group je **stateful** — dozvoljen inbound automatski dozvoljava odgovor nazad.
 
 ## Korisni linkovi
 
 - [AWS EC2 Key Pairs](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html)
 - [AWS SSM Session Manager](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html)
 - [Session Manager Plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html)
-- [AmazonSSMManagedInstanceCore Policy](https://docs.aws.amazon.com/aws-managed-policy/latest/reference/AmazonSSMManagedInstanceCore.html)
+- [EC2 Instance Profiles](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html)
 - [EC2 Security Groups](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-security-groups.html)
 

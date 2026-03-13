@@ -2,113 +2,82 @@
 
 ## Cilj
 
-Postaviti bezbedan Terraform workflow u AWS-u koristeci **assume role** model:
+Postaviti bezbedan Terraform workflow u AWS-u koristeci **assume role** model. Korisnik `terraform-user` sluzi samo za autentikaciju — svi resursi se kreiraju preko IAM role.
 
-- `terraform-user` — IAM korisnik koji se koristi samo za autentikaciju i pristup state backend-u.
-- `TerraformAdminRole` — IAM rola sa dozvolama za kreiranje infrastrukture. Terraform je assume-uje.
-- S3 backend — Terraform state se cuva u posebnom S3 bucket-u sa minimalnim dozvolama.
+## Preduslovi
 
-## Bezbednosni model
+- Zavrsen Zadatak 0 (Terraform CLI, AWS CLI, AWS profil).
+- Prava u AWS nalogu za kreiranje IAM korisnika, IAM rola i S3 bucket-a.
+
+## Kontekst
+
+Terraform ne treba da koristi kredencijale sa sirokim dozvolama. Umesto toga, koristi se **assume role** pattern — korisnik ima minimalne dozvole, a infrastrukturne operacije izvrsava kroz privremene kredencijale IAM role.
 
 ```text
 terraform-user credentials
         |
-        +--> S3 backend (state read/write + lock)
+        +--> S3 backend (state read/write)
         |
-        +--> sts:AssumeRole --> TerraformAdminRole --> AWS resursi (EC2, VPC, S3...)
+        +--> sts:AssumeRole --> TerraformAdminRole --> AWS resursi
 ```
-
-`terraform-user` **nema** direktne dozvole za EC2, VPC, RDS i slicno — sve ide kroz rolu.
 
 ## Zahtevi
 
-### 1. Kreirati IAM korisnika `terraform-user`
+### 1. IAM korisnik `terraform-user`
 
-- Programmatic access (Access Key + Secret Key).
-- Dodeliti **samo** dve grupe dozvola:
-  - Pristup S3 state backend bucket-u (minimalne dozvole).
-  - Pravo `sts:AssumeRole` nad `TerraformAdminRole`.
+Kreirati IAM korisnika sa programmatic access-om. Korisnik treba da ima **samo** dve grupe dozvola:
 
-**Minimalne backend dozvole:**
+- Minimalne S3 dozvole za citanje i pisanje Terraform state-a u backend bucket-u.
+- Pravo da assume-uje `TerraformAdminRole`.
 
-| Dozvola | Nivo | Svrha |
-|---------|------|-------|
-| `s3:ListBucket` | Bucket | Provera da li state fajl postoji |
-| `s3:GetObject` | Objekat | Citanje state-a |
-| `s3:PutObject` | Objekat | Pisanje state-a |
-| `s3:DeleteObject` | `.tflock` objekat | Brisanje lock fajla |
-| `s3:GetObjectVersion` | Objekat | Opciono — za versioning |
+> Istrazi koje S3 akcije su potrebne da bi Terraform backend radio (citanje, pisanje, listanje, lock fajl).
 
-> **Tip:** Koristi AWS profil (`aws configure --profile terraform`) ili environment varijable. Nikada ne hardkodirati kljuceve u `.tf` fajlove.
+### 2. IAM rola `TerraformAdminRole`
 
-### 2. Kreirati IAM rolu `TerraformAdminRole`
+Kreirati IAM rolu sa:
 
-- **Trust policy:** Dozvoljava `terraform-user` da uradi `sts:AssumeRole`.
-- **Permission policy:** Dozvole za servise koje Terraform treba da upravlja (EC2, VPC, S3, IAM, CloudWatch, itd).
+- **Trust policy** koja dozvoljava `terraform-user` da uradi `sts:AssumeRole`.
+- **Permission policy** sa dozvolama za servise koje Terraform treba da upravlja (EC2, VPC, S3, IAM, itd).
 
-> **Napomena:** U ovom zadatku je dozvoljen siri scope dozvola radi vezbe. U produkciji koristiti granularne policy-je po servisu sa ogranicenim `Resource` blokom.
+### 3. S3 backend bucket
 
-### 3. Kreirati S3 backend bucket (van Terraform koda)
+Kreirati S3 bucket za Terraform state **van glavnog Terraform koda** (rucno ili kroz `bootstrap/`). Bucket mora imati:
 
-Bucket za state se kreira **rucno** ili kroz poseban bootstrap Terraform (videti `bootstrap/` direktorijum).
+- Versioning
+- Server-side encryption
+- Block public access
 
-Obavezno omoguciti:
-- **Versioning** — zastita od slucajnog brisanja/prepisivanja state-a.
-- **Server-side encryption** (AES256 ili KMS) — state moze sadrzati osetljive podatke.
-- **Block public access** — state nikada ne sme biti javno dostupan.
+> Backend bucket je odvojen od test resursa koje Terraform kreira.
 
-> **Bitno:** Backend bucket je **odvojen** od test S3 bucket-a koji se kreira kroz Terraform (`aws_s3_bucket.test`).
+### 4. Provider konfiguracija
 
-### 4. Konfigurisati Terraform provider
+Konfigurisati Terraform provider da:
 
-- Provider koristi lokalni AWS profil (`var.aws_profile`).
-- Provider koristi `assume_role` blok ka `TerraformAdminRole`.
-- Backend konfiguracija se drzi u lokalnom `backend.hcl` fajlu (ne commit-ovati).
+- Koristi lokalni AWS profil za autentikaciju.
+- Koristi `assume_role` blok za sve infrastrukturne operacije.
+- Backend konfiguraciju drzi u lokalnom fajlu koji se ne commit-uje.
 
-```bash
-terraform init -backend-config=backend.hcl
-```
+## Isporuka
 
-### 5. Verifikacija
+- [ ] `terraform-user` postoji sa programmatic access-om
+- [ ] `terraform-user` ima samo backend i assume-role dozvole (nema direktan pristup EC2/VPC/...)
+- [ ] `TerraformAdminRole` postoji sa trust policy-jem ka `terraform-user`
+- [ ] S3 backend bucket ima versioning, enkripciju i block public access
+- [ ] `terraform init` uspesno konfigurise backend
+- [ ] `terraform apply` uspesno kreira test resurse (S3 bucket, VPC, EC2) kroz rolu
 
-Potvrditi da Terraform moze da kreira test resurse preko role:
+## Napomene
 
-- [x] S3 bucket (nije backend bucket) — `aws_s3_bucket.test`
-- [x] VPC + subnet — `aws_vpc.test`, `aws_subnet.public`
-- [x] EC2 instancu — `aws_instance.test`
-
-Ako ovo radi, assume-role model je ispravno postavljen.
-
-## Koraci za implementaciju
-
-1. Definisi IAM resurse u `iam.tf`:
-   - `aws_iam_user.terraform_user`
-   - `aws_iam_role.terraform_admin` sa trust policy-jem
-   - Policy dokumenti za backend pristup i admin dozvole
-2. Konfiguriši provider u `versions.tf` sa `assume_role` blokom.
-3. Konfiguriši backend u `backend.tf`.
-4. Pokreni `terraform init` i `terraform plan`.
-5. Proveri da `terraform apply` uspesno kreira test resurse.
-
-## Hardening nakon vezbe
-
-- Zameni siroke policy-je **granularnim** policy-jima po servisu.
-- Ogranici `Resource` gde god je moguce (ne koristiti `"*"` u produkciji).
-- Rotiraj sve kljuceve koji su ikada bili izlozeni.
-- Zadrzi versioning i enkripciju za state bucket.
-- Razmotri dodavanje `prevent_destroy` lifecycle bloka na kriticne IAM resurse.
-
-## Saveti
-
-- **Least privilege:** Daj samo minimalne dozvole koje su potrebne. Lakse je dodati dozvole nego otkriti da imas previse.
-- **State je osetljiv:** Terraform state moze sadrzati lozinke, kljuceve i druge tajne. Tretirati ga kao poverljiv podatak.
-- **Bootstrap problem:** Backend bucket ne moze sam sebe kreirati — mora postojati pre `terraform init`. Koristi `bootstrap/` direktorijum ili rucno kreiranje.
-- **Import:** Ako su IAM resursi vec kreirani rucno, koristi `terraform import` da ih uvezis u state. Videti `docs/import-guide.md`.
+- Backend bucket ne moze sam sebe kreirati — mora postojati pre `terraform init`. Pogledaj `bootstrap/` direktorijum.
+- Ako su IAM resursi vec kreirani rucno, koristi `terraform import` da ih uvezis u state.
+- U produkciji zameni siroke policy-je granularnim sa ogranicenim `Resource` blokom.
+- Razmotri `prevent_destroy` lifecycle blok na kriticnim IAM resursima.
 
 ## Korisni linkovi
 
 - [AWS IAM Best Practices](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html)
 - [Terraform S3 Backend](https://developer.hashicorp.com/terraform/language/backend/s3)
 - [AWS STS AssumeRole](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html)
+- [Terraform aws_iam_role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role)
 - [Terraform Import](https://developer.hashicorp.com/terraform/cli/import)
 
