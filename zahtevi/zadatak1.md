@@ -2,76 +2,43 @@
 
 ## Cilj
 
-Postaviti bezbedan Terraform workflow u AWS-u koristeci **assume role** model. Korisnik `terraform-user` sluzi samo za autentikaciju — svi resursi se kreiraju preko IAM role.
+Tvoj zadatak je da postavis IAM model u kome Terraform ne koristi siroke korisnicke dozvole, vec radi kroz **assume role** pristup.
 
 ## Preduslovi
 
-- Zavrsen Zadatak 0 (Terraform CLI, AWS CLI, AWS profil).
-- Prava u AWS nalogu za kreiranje IAM korisnika, IAM rola i S3 bucket-a.
+- Zavrsen Zadatak 0
+- Dovoljna prava u AWS nalogu za IAM i S3
 
-## Kontekst
+## Tvoj zadatak
 
-Terraform ne treba da koristi kredencijale sa sirokim dozvolama. Umesto toga, koristi se **assume role** pattern — korisnik ima minimalne dozvole, a infrastrukturne operacije izvrsava kroz privremene kredencijale IAM role.
-
-```text
-terraform-user credentials
-        |
-        +--> S3 backend (state read/write)
-        |
-        +--> sts:AssumeRole --> TerraformAdminRole --> AWS resursi
-```
-
-## Zahtevi
-
-### 1. IAM korisnik `terraform-user`
-
-Kreirati IAM korisnika sa programmatic access-om. Korisnik treba da ima **samo** dve grupe dozvola:
-
-- Minimalne S3 dozvole za citanje i pisanje Terraform state-a u backend bucket-u.
-- Pravo da assume-uje `TerraformAdminRole`.
-
-> Istrazi koje S3 akcije su potrebne da bi Terraform backend radio (citanje, pisanje, listanje, lock fajl).
-
-### 2. IAM rola `TerraformAdminRole`
-
-Kreirati IAM rolu sa:
-
-- **Trust policy** koja dozvoljava `terraform-user` da uradi `sts:AssumeRole`.
-- **Permission policy** sa dozvolama za servise koje Terraform treba da upravlja (EC2, VPC, S3, IAM, itd).
-
-### 3. S3 backend bucket
-
-Kreirati S3 bucket za Terraform state **van glavnog Terraform koda** (rucno ili kroz `bootstrap/`). Bucket mora imati:
-
-- Versioning
-- Server-side encryption
-- Block public access
-
-> Backend bucket je odvojen od test resursa koje Terraform kreira.
-
-### 4. Provider konfiguracija
-
-Konfigurisati Terraform provider da:
-
-- Koristi lokalni AWS profil za autentikaciju.
-- Koristi `assume_role` blok za sve infrastrukturne operacije.
-- Backend konfiguraciju drzi u lokalnom fajlu koji se ne commit-uje.
+1. Kreiraj IAM korisnika `terraform-user` za programski pristup.
+2. Ogranici `terraform-user` na samo dve vrste dozvola:
+   - pristup S3 backend bucket-u za Terraform state
+   - pravo da assume-uje `TerraformAdminRole`
+3. Kreiraj IAM rolu `TerraformAdminRole` koju `terraform-user` moze da assume-uje.
+4. Dodeli toj roli dozvole potrebne da Terraform upravlja resursima u ovom projektu.
+5. Kreiraj poseban S3 bucket za Terraform state van glavne Terraform konfiguracije.
+6. Konfigurisi Terraform tako da koristi lokalni AWS profil za autentikaciju, a rolu za infrastrukturne operacije.
+7. Konfigurisi S3 backend sa partial konfiguracijskim fajlom (`-backend-config`).
+8. Kreiraj test resurse (VPC, public subnet, Internet Gateway, Security Group, EC2 instancu, S3 bucket) da verifikujes da assume-role model radi.
 
 ## Isporuka
 
-- [ ] `terraform-user` postoji sa programmatic access-om
-- [ ] `terraform-user` ima samo backend i assume-role dozvole (nema direktan pristup EC2/VPC/...)
-- [ ] `TerraformAdminRole` postoji sa trust policy-jem ka `terraform-user`
-- [ ] S3 backend bucket ima versioning, enkripciju i block public access
+- [ ] `terraform-user` postoji i ima programski pristup
+- [ ] `terraform-user` nema direktne dozvole za upravljanje infrastrukturom
+- [ ] `TerraformAdminRole` postoji i trust policy dozvoljava assume role od strane `terraform-user`
+- [ ] Backend bucket postoji i ima versioning, enkripciju i block public access
+- [ ] S3 backend je konfigurisan sa partial config fajlom (`backend.hcl`)
 - [ ] `terraform init` uspesno konfigurise backend
-- [ ] `terraform apply` uspesno kreira test resurse (S3 bucket, VPC, EC2) kroz rolu
+- [ ] Test VPC, EC2 instanca i S3 bucket su kreirani kroz assume-role model
+- [ ] `terraform apply` prolazi bez gresaka
 
-## Napomene
+## Hintovi (opciono)
 
-- Backend bucket ne moze sam sebe kreirati — mora postojati pre `terraform init`. Pogledaj `bootstrap/` direktorijum.
-- Ako su IAM resursi vec kreirani rucno, koristi `terraform import` da ih uvezis u state.
-- U produkciji zameni siroke policy-je granularnim sa ogranicenim `Resource` blokom.
-- Razmotri `prevent_destroy` lifecycle blok na kriticnim IAM resursima.
+- Terraform backend za S3 zahteva vise od samog `GetObject` i `PutObject` — istrazi i listanje i lock fajl.
+- Backend bucket mora postojati pre `terraform init`; zato se pravi van glavne konfiguracije ili kroz `bootstrap/`.
+- Ako su neki IAM resursi vec kreirani rucno, mozes koristiti `terraform import`.
+- U produkciji koristi uze policy-je i ogranicen `Resource` scope.
 
 ## Korisni linkovi
 
