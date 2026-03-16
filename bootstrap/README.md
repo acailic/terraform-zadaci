@@ -41,4 +41,4 @@ Then return to the repo root and run the main infrastructure stack.
 
 If `terraform-user`, `TerraformAdminRole`, or the policy already exist because
 they were created manually in the console, import them into this stack instead
-of recreating them. See `../docs/import-guide.md`.
+of recreating them. See `../docs/guides/import-guide.md`.
