@@ -10,7 +10,7 @@ Terraform repository with two separate roots:
 ```text
 bootstrap/          # Bootstrap IAM stack
 *.tf                # Main infrastructure stack (VPC, subnet, EC2, S3, SSM)
-docs/               # Guides, plans, checklists
+docs/               # Organized guides, tasks, reviews, plans
 scripts/            # Helper scripts
 ```
 
@@ -65,10 +65,11 @@ Manager secret, and the test S3 bucket.
 ## Documentation
 
 - [Bootstrap Stack](bootstrap/README.md) - IAM bootstrap workflow
-- [Import Guide](docs/import-guide.md) - Import manually-created IAM resources into the bootstrap stack
-- [Provider Versioning Guide](docs/provider-versioning.md) - Terraform provider version management
-- [Zadatak 1 - IAM Setup](docs/zadatak1/zadatak1.md) - IAM user, role, and S3 backend configuration
-- [Zadatak 2 - EC2 Access](docs/zadatak2/zadatak2.md) - SSH key pair, security group, and SSM Session Manager
+- [Docs Index](docs/README.md) - Overview of the documentation structure
+- [Import Guide](docs/guides/import-guide.md) - Import manually-created IAM resources into the bootstrap stack
+- [Provider Versioning Guide](docs/guides/provider-versioning.md) - Terraform provider version management
+- [Zadatak 1 - IAM Setup](docs/tasks/zadatak1/README.md) - IAM user, role, and S3 backend configuration
+- [Zadatak 2 - EC2 Access](docs/tasks/zadatak2/README.md) - SSH key pair, security group, and SSM Session Manager
 
 ## Current notes
 

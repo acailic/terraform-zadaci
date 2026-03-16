@@ -52,7 +52,7 @@ resource "aws_subnet" "public" {
 
   tags = { Name = "${local.name_prefix}-public-subnet" }
 }
-## 
+
 
 # ----- Internet Gateway + Public Route Table --------------------------------
 
@@ -106,7 +106,7 @@ resource "aws_route_table_association" "private" {
 
 resource "aws_security_group" "web" {
   vpc_id      = aws_vpc.test.id
-  description = "Allow HTTP and SSH inbound"
+  description = "Allow HTTP inbound"
 
   dynamic "ingress" {
     for_each = var.ingress_ports
