@@ -9,9 +9,12 @@ Terraform repository with two separate roots:
 
 ```text
 bootstrap/          # Bootstrap IAM stack
-*.tf                # Main infrastructure stack (VPC, subnet, EC2, S3, SSM)
-docs/               # Organized guides, tasks, reviews, plans
-scripts/            # Helper scripts
+main.tf             # VPC, subnets, NAT gateway, EC2, S3, VPC endpoints
+iam.tf              # IAM role, instance profile, S3 access policy
+variables.tf        # Input variables
+outputs.tf          # Output values
+versions.tf         # Provider config with assume_role
+docs/               # Organized guides, tasks, learning materials
 ```
 
 ## Workflow
@@ -70,6 +73,7 @@ Manager secret, and the test S3 bucket.
 - [Provider Versioning Guide](docs/guides/provider-versioning.md) - Terraform provider version management
 - [Zadatak 1 - IAM Setup](docs/tasks/zadatak1/README.md) - IAM user, role, and S3 backend configuration
 - [Zadatak 2 - EC2 Access](docs/tasks/zadatak2/README.md) - SSH key pair, security group, and SSM Session Manager
+- [Learning: NAT, S3, SSH Tunnel](docs/learning/05-nat-s3-ssh-tunnel.md) - NAT gateway, S3 access from EC2, SSH over SSM tunnel
 
 ## Current notes
 
@@ -97,8 +101,20 @@ Manager secret, and the test S3 bucket.
     - [x] EC2 prebacen u private subnet (`aws_subnet.private`, 10.0.2.0/24)
     - [x] dodat VPC endpointi (PrivateLink) za SSM: `ssm`, `ssmmessages`, `ec2messages`
     - [x] uklonjena zavisnost od internet gateway-a za EC2
-    - SSM pristup: instance profile (ne root) daje kredencijale SSM Agentu
-    - connect: `aws ssm start-session --target <instance-id>`
+    - [x] SSM pristup: instance profile (ne root) daje kredencijale SSM Agentu
+#- connect: `aws ssm start-session --target <instance-id>`
 
-- random prefix za secret name
+- random suffix fix za secret name
 - access key zameniti u aws profile
+
+
+
+- [x] NAT gateway (`aws_nat_gateway.main` u public subnetu, `aws_eip.nat`, ruta u private RT)
+- [x] SSH pristup preko SSM tunela (kljuc u Secrets Manager, port forwarding kroz SSM)
+- [x] S3 pristup sa EC2 instance (`aws_iam_policy.ec2_s3_access` + `aws_vpc_endpoint.s3` gateway)
+    - put: `aws s3 cp test.txt s3://bucket/test.txt`
+    - get: `aws s3 cp s3://bucket/test.txt ./downloaded.txt`
+    - list: `aws s3 ls s3://bucket/`
+
+
+

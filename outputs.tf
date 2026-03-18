@@ -42,3 +42,23 @@ output "vpce_ssm_ids" {
   description = "IDs of the SSM VPC endpoints."
   value       = { for k, v in aws_vpc_endpoint.ssm : k => v.id }
 }
+
+output "nat_gateway_id" {
+  description = "ID of the NAT gateway in the public subnet."
+  value       = aws_nat_gateway.main.id
+}
+
+output "nat_gateway_public_ip" {
+  description = "Public IP of the NAT gateway (Elastic IP)."
+  value       = aws_eip.nat.public_ip
+}
+
+output "ec2_s3_policy_arn" {
+  description = "ARN of the IAM policy granting EC2 S3 access."
+  value       = aws_iam_policy.ec2_s3_access.arn
+}
+
+output "s3_gateway_endpoint_id" {
+  description = "ID of the S3 Gateway VPC endpoint."
+  value       = aws_vpc_endpoint.s3.id
+}

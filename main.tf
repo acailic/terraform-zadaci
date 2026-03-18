@@ -1,8 +1,8 @@
 # =============================================================================
 # Infra – Single-root Terraform configuration
 #
-# Manages IAM (iam.tf) and application resources (VPC, subnet, EC2, S3)
-# in a single state. Uses the terraform profile directly.
+# Application resources (VPC, subnet, EC2, S3). IAM lives in iam.tf.
+# Uses the terraform profile with assume_role to TerraformAdminRole.
 # =============================================================================
 
 # ----- Test S3 bucket --------------------------------------------------------
@@ -92,7 +92,10 @@ resource "aws_subnet" "private" {
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.test.id
 
-  # No routes — no internet access. VPC endpoints provide AWS service access.
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.main.id
+  }
 
   tags = { Name = "${local.name_prefix}-private-rt" }
 }
@@ -100,6 +103,23 @@ resource "aws_route_table" "private" {
 resource "aws_route_table_association" "private" {
   subnet_id      = aws_subnet.private.id
   route_table_id = aws_route_table.private.id
+}
+
+# ----- NAT Gateway -----------------------------------------------------------
+
+resource "aws_eip" "nat" {
+  domain = "vpc"
+
+  tags = { Name = "${local.name_prefix}-nat-eip" }
+}
+
+resource "aws_nat_gateway" "main" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.public.id
+
+  tags = { Name = "${local.name_prefix}-nat-gw" }
+
+  depends_on = [aws_internet_gateway.main]
 }
 
 # ----- Security Group -------------------------------------------------------
@@ -172,6 +192,17 @@ resource "aws_vpc_endpoint" "ssm" {
   }
 }
 
+# ----- S3 Gateway Endpoint (free) ---------------------------------------------
+# da ne ide preko NAT, vec direktno preko AWS backbone-a. Ne koristi se security group jer je Gateway endpoint.
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = aws_vpc.test.id
+  service_name      = "com.amazonaws.${var.aws_region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = [aws_route_table.private.id]
+
+  tags = { Name = "${local.name_prefix}-s3-vpce" }
+}
+
 # ----- TLS Private Key + Secrets Manager -------------------------------------
 # Generise SSH key par u Terraformu. Privatni kljuc se cuva u AWS Secrets Manager.
 # Rotacija kljuceva je bitna — moze se automatizovati sa Lambda funkcijom.
@@ -204,35 +235,6 @@ resource "aws_secretsmanager_secret_version" "ssh_private_key" {
   secret_string = tls_private_key.main.private_key_openssh
 }
 
-# ----- EC2 SSM Instance Profile ---------------------------------------------
-
-resource "aws_iam_role" "ec2_ssm" {
-  name = "${local.name_prefix}-ec2-ssm-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action    = "sts:AssumeRole"
-      Effect    = "Allow"
-      Principal = { Service = "ec2.amazonaws.com" }
-    }]
-  })
-
-  tags = { Name = "${local.name_prefix}-ec2-ssm-role" }
-}
-
-resource "aws_iam_role_policy_attachment" "ec2_ssm" {
-  role       = aws_iam_role.ec2_ssm.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-}
-
-resource "aws_iam_instance_profile" "ec2_ssm" {
-  name = "${local.name_prefix}-ec2-ssm-profile"
-  role = aws_iam_role.ec2_ssm.name
-
-  tags = { Name = "${local.name_prefix}-ec2-ssm-profile" }
-}
-
 # ----- EC2 instance ---------------------------------------------------------
 
 resource "aws_instance" "test" {
@@ -243,9 +245,8 @@ resource "aws_instance" "test" {
   key_name               = aws_key_pair.main.key_name
   iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
 
-  # NOTE: user_data yum komande zahtevaju internet. U private subnetu bez NAT-a
-  # nece raditi. SSM Agent je pre-instaliran na Amazon Linux 2023, tako da SSM
-  # i dalje radi. Dodati NAT gateway ili S3 gateway endpoint ako treba yum.
+  # user_data runs on instance launch. The private subnet reaches the internet
+  # via the NAT gateway in the public subnet.
   user_data = <<-EOF
     #!/bin/bash
     set -euo pipefail
