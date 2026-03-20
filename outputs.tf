@@ -62,3 +62,24 @@ output "s3_gateway_endpoint_id" {
   description = "ID of the S3 Gateway VPC endpoint."
   value       = aws_vpc_endpoint.s3.id
 }
+
+# ALB outputs (zakomentarisan — option b: NLB)
+# output "alb_dns_name" {
+#   description = "Public DNS of the ALB — open this in browser to see your web server."
+#   value       = aws_lb.main.dns_name
+# }
+#
+# output "alb_url" {
+#   description = "Full URL to access the web server via ALB."
+#   value       = "http://${aws_lb.main.dns_name}"
+# }
+
+output "nlb_dns_name" {
+  description = "Public DNS of the NLB — use for SSH: ssh -i key ec2-user@<nlb_dns>"
+  value       = aws_lb.nlb.dns_name
+}
+
+output "nlb_ssh_command" {
+  description = "SSH command via NLB (retrieve key from Secrets Manager first)."
+  value       = "ssh -i private-key.pem ec2-user@${aws_lb.nlb.dns_name}"
+}

@@ -115,6 +115,42 @@ Manager secret, and the test S3 bucket.
     - put: `aws s3 cp test.txt s3://bucket/test.txt`
     - get: `aws s3 cp s3://bucket/test.txt ./downloaded.txt`
     - list: `aws s3 ls s3://bucket/`
+z6
+option a)
+- [x] proveriti 443 za ec2 — VPCE SG dozvoljava 443 (SSM endpointi); httpd na EC2 sluša na 80; nema HTTPS listenera na ALB-u (nema SSL cert-a)
+- [x] curl localhost:80 — `user_data` instalira httpd i postavlja `/var/www/html/index.html`; ALB health check potvrđuje HTTP 200 na `/index.html`
+- [x] ALB ispred EC2 — `aws_lb.main` (internet-facing, application), `aws_security_group.alb` (80 → 0.0.0.0/0), security group chaining (EC2 prihvata 80 samo od ALB SG), target group + HTTP listener; output: `alb_url`
+- application firewall (WAF) — nije implementiran, ovo je vise samo pomenuto
+
+option b)
+- [x] zakomentarisan ALB (`aws_lb.main`, `aws_security_group.alb`, target group, listener — sve zakomentarisano u main.tf)
+- [x] NLB implementiran (`aws_lb.nlb`, internet-facing, network type)
+    - NLB radi na Layer 4 (TCP) — prosleđuje TCP konekciju bez inspekcije
+    - NLB **nema security group** — propušta originalni client source IP do EC2
+    - EC2 SG dozvoljava SSH (22) od `allowed_cidr_blocks` (ne SG chaining kao kod ALB-a)
+    - Target Group: TCP port 22, health check = TCP konekcija na port 22
+    - Listener: TCP port 22 → forward na SSH target group
+    - output: `nlb_dns_name`, `nlb_ssh_command`
+    - test: `ssh -i private-key.pem ec2-user@<nlb_dns_name>`
+
+z7
+- RDS baza free (MySQL), - EC2 konnectija ka bazi( private subnet)
+- sve u secret manager da se cuvaju podaci za konekciju
+        --root pass od baze u secret manager( username i root pass). secret manager - moze da cuva podeljen conneciton string(username, password, host, port)  
+- MySQL konekcija ka bazi
+- Cena za rds
 
 
+- Containers registry and service
 
+
+-----
+- da iskljucim asi
+
+usput predlozi:
+
+-- permisije: 600 vs 644 owner,read/write, owner, others
+- VPC,
+
+-- linux komande, permisije, interfjesiji,permisjije 
+- CNAME, A record, DNS, Route53

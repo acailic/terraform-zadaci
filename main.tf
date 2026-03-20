@@ -48,8 +48,8 @@ resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.test.id
   cidr_block              = var.public_subnet_cidr
   availability_zone       = "${var.aws_region}a"
-  map_public_ip_on_launch = true ## dodaje public IP na instance u ovom subnetu
-
+  map_public_ip_on_launch = false ## dodaje public IP na instance u ovom subnetu
+### probati izlaz sa masine ß
   tags = { Name = "${local.name_prefix}-public-subnet" }
 }
 
@@ -126,16 +126,17 @@ resource "aws_nat_gateway" "main" {
 
 resource "aws_security_group" "web" {
   vpc_id      = aws_vpc.test.id
-  description = "Allow HTTP inbound"
+  description = "Allow SSH inbound for NLB (NLB has no SG - passes client IP directly)"
 
-  dynamic "ingress" {
-    for_each = var.ingress_ports
-    content {
-      from_port   = ingress.value
-      to_port     = ingress.value
-      protocol    = "tcp"
-      cidr_blocks = var.allowed_cidr_blocks
-    }
+  # NLB radi na Layer 4 (TCP) i NEMA security group.
+  # NLB propušta originalni client source IP do EC2.
+  # Zato EC2 SG mora da dozvoli SSH od CIDR blokova, ne od SG-a.
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = var.allowed_cidr_blocks
+    description = "SSH via NLB (client IP passthrough)"
   }
 
   egress {
@@ -255,7 +256,171 @@ resource "aws_instance" "test" {
     systemctl start httpd
     systemctl enable httpd
     echo "<h1>Hello from $(hostname -f)</h1>" > /var/www/html/index.html
+
   EOF
 
   tags = { Name = "${local.name_prefix}-ec2" }
+}
+##### update user data with javascript, to load secrets from secrets, da se sacuva conneciton string 
+###### prilikom kreirajanja instance napraviti skripty da ucita secrete pomocu aws cli i stavi ga kao ENV varijably
+###### da u kodu ucita konekciju za bazu .
+
+
+# =============================================================================
+# ALB – zakomentarisan (option b: NLB umesto ALB-a)
+# =============================================================================
+
+# ----- Drugi public subnet (potreban i za NLB — 2 AZ-a) ----------------------
+# NLB ne zahteva 2 AZ-a kao ALB, ali je best practice za high availability.
+
+resource "aws_subnet" "public_b" {
+  vpc_id                  = aws_vpc.test.id
+  cidr_block              = var.public_subnet_b_cidr
+  availability_zone       = "${var.aws_region}b"
+  map_public_ip_on_launch = true
+
+  tags = { Name = "${local.name_prefix}-public-subnet-b" }
+}
+
+resource "aws_route_table_association" "public_b" {
+  subnet_id      = aws_subnet.public_b.id
+  route_table_id = aws_route_table.public.id
+}
+
+# ----- ALB Security Group (zakomentarisan — NLB nema SG) ---------------------
+# resource "aws_security_group" "alb" {
+#   vpc_id      = aws_vpc.test.id
+#   description = "Allow HTTP inbound to ALB from the internet"
+#
+#   ingress {
+#     from_port   = 80
+#     to_port     = 80
+#     protocol    = "tcp"
+#     cidr_blocks = ["0.0.0.0/0"]
+#     description = "HTTP from internet"
+#   }
+#
+#   egress {
+#     from_port   = 0
+#     to_port     = 0
+#     protocol    = "-1"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
+#
+#   tags = { Name = "${local.name_prefix}-alb-sg" }
+# }
+
+# ----- ALB (zakomentarisan) ---------------------------------------------------
+# resource "aws_lb" "main" {
+#   name               = "${local.name_prefix}-alb"
+#   internal           = false
+#   load_balancer_type = "application"
+#   security_groups    = [aws_security_group.alb.id]
+#   subnets            = [aws_subnet.public.id, aws_subnet.public_b.id]
+#
+#   tags = { Name = "${local.name_prefix}-alb" }
+# }
+
+# ----- ALB Target Group (zakomentarisan) --------------------------------------
+# resource "aws_lb_target_group" "web" {
+#   name     = "${local.name_prefix}-tg"
+#   port     = 80
+#   protocol = "HTTP"
+#   vpc_id   = aws_vpc.test.id
+#
+#   health_check {
+#     path                = "/index.html"
+#     protocol            = "HTTP"
+#     healthy_threshold   = 2
+#     unhealthy_threshold = 3
+#     timeout             = 5
+#     interval            = 30
+#     matcher             = "200"
+#   }
+#
+#   tags = { Name = "${local.name_prefix}-tg" }
+# }
+
+# ----- ALB Target Group Attachment (zakomentarisan) ---------------------------
+# resource "aws_lb_target_group_attachment" "web" {
+#   target_group_arn = aws_lb_target_group.web.arn
+#   target_id        = aws_instance.test.id
+#   port             = 80
+# }
+
+# ----- ALB HTTP Listener (zakomentarisan) -------------------------------------
+# resource "aws_lb_listener" "http" {
+#   load_balancer_arn = aws_lb.main.arn
+#   port              = 80
+#   protocol          = "HTTP"
+#
+#   default_action {
+#     type             = "forward"
+#     target_group_arn = aws_lb_target_group.web.arn
+#   }
+# }
+
+# =============================================================================
+# NLB – Network Load Balancer (option b)
+#
+# NLB radi na Layer 4 (TCP/UDP) — prosleđuje TCP konekcije bez inspekcije.
+# Razlike u odnosu na ALB:
+#   - NLB NEMA security group — client IP se propušta direktno do EC2
+#   - NLB podržava statičke IP adrese (Elastic IP po AZ-u)
+#   - NLB ima mnogo manji latency (milioni req/s)
+#   - NLB ne može da rutira po URL path-u (to radi ALB na Layer 7)
+#   - Health check: TCP konekcija na port 22 (ne HTTP GET)
+# =============================================================================
+
+resource "aws_lb" "nlb" {
+  name               = "${local.name_prefix}-nlb"
+  internal           = false # internet-facing
+  load_balancer_type = "network"
+  # NLB nema security_groups parametar!
+  subnets = [aws_subnet.public.id, aws_subnet.public_b.id]
+
+  tags = { Name = "${local.name_prefix}-nlb" }
+}
+
+# ----- NLB Target Group (TCP port 22) ----------------------------------------
+# Target Group za NLB koristi protocol = "TCP" (ne HTTP).
+# Health check je TCP — samo proverava da li može da otvori konekciju na port 22.
+
+resource "aws_lb_target_group" "ssh" {
+  name     = "${local.name_prefix}-ssh-tg"
+  port     = 22
+  protocol = "TCP"
+  vpc_id   = aws_vpc.test.id
+
+  health_check {
+    protocol            = "TCP"       # TCP check — samo proveri da li je port otvoren
+    port                = 22
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    interval            = 10          # NLB podržava 10s interval (ALB min 30s)
+  }
+
+  tags = { Name = "${local.name_prefix}-ssh-tg" }
+}
+
+# ----- NLB Target Group Attachment --------------------------------------------
+
+resource "aws_lb_target_group_attachment" "ssh" {
+  target_group_arn = aws_lb_target_group.ssh.arn
+  target_id        = aws_instance.test.id
+  port             = 22
+}
+
+# ----- NLB TCP Listener (port 22) --------------------------------------------
+# Sluša na NLB-u na portu 22 i prosleđuje TCP konekcije na Target Group.
+
+resource "aws_lb_listener" "ssh" {
+  load_balancer_arn = aws_lb.nlb.arn
+  port              = 22
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.ssh.arn
+  }
 }
