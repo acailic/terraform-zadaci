@@ -84,3 +84,29 @@ variable "instance_type" {
   type        = string
   default     = "t3.micro"
 }
+
+# ----- RDS variables ---------------------------------------------------------
+
+variable "private_subnet_b_cidr" {
+  description = "CIDR block for the second private subnet (RDS requires 2 AZs)."
+  type        = string
+  default     = "10.0.4.0/24"
+}
+
+variable "rds_instance_class" {
+  description = "RDS instance class (db.t3.micro for Free Tier)."
+  type        = string
+  default     = "db.t3.micro"
+}
+
+variable "rds_db_name" {
+  description = "Name of the MySQL database to create."
+  type        = string
+  default     = "appdb"
+}
+
+variable "rds_username" {
+  description = "Master username for the RDS instance."
+  type        = string
+  default     = "admin"
+}

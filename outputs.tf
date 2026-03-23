@@ -83,3 +83,25 @@ output "nlb_ssh_command" {
   description = "SSH command via NLB (retrieve key from Secrets Manager first)."
   value       = "ssh -i private-key.pem ec2-user@${aws_lb.nlb.dns_name}"
 }
+
+# ----- RDS outputs -----------------------------------------------------------
+
+output "rds_endpoint" {
+  description = "RDS MySQL endpoint (host:port)."
+  value       = aws_db_instance.main.endpoint
+}
+
+output "rds_address" {
+  description = "RDS MySQL hostname (without port)."
+  value       = aws_db_instance.main.address
+}
+
+output "rds_credentials_secret_arn" {
+  description = "ARN of the Secrets Manager secret storing RDS credentials."
+  value       = aws_secretsmanager_secret.rds_credentials.arn
+}
+
+output "rds_mysql_command" {
+  description = "MySQL connect command (run from EC2 instance, retrieve password from Secrets Manager)."
+  value       = "mysql -h ${aws_db_instance.main.address} -u ${var.rds_username} -p ${var.rds_db_name}"
+}

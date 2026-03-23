@@ -64,3 +64,32 @@ resource "aws_iam_role_policy_attachment" "ec2_s3_access" {
   role       = aws_iam_role.ec2_ssm.name
   policy_arn = aws_iam_policy.ec2_s3_access.arn
 }
+
+# ----- Secrets Manager read policy for EC2 ------------------------------------
+
+resource "aws_iam_policy" "ec2_secrets_read" {
+  name        = "${local.name_prefix}-ec2-secrets-read"
+  description = "Allow EC2 instance to read RDS credentials from Secrets Manager."
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "ReadRdsSecret"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret",
+        ]
+        Resource = [aws_secretsmanager_secret.rds_credentials.arn]
+      },
+    ]
+  })
+
+  tags = { Name = "${local.name_prefix}-ec2-secrets-read" }
+}
+
+resource "aws_iam_role_policy_attachment" "ec2_secrets_read" {
+  role       = aws_iam_role.ec2_ssm.name
+  policy_arn = aws_iam_policy.ec2_secrets_read.arn
+}
