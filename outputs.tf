@@ -84,6 +84,11 @@ output "nlb_ssh_command" {
   value       = "ssh -i private-key.pem ec2-user@${aws_lb.nlb.dns_name}"
 }
 
+output "nlb_web_url" {
+  description = "Web app URL via NLB — open in browser to see DB viewer."
+  value       = "http://${aws_lb.nlb.dns_name}/db.php"
+}
+
 # ----- RDS outputs -----------------------------------------------------------
 
 output "rds_endpoint" {

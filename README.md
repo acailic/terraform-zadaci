@@ -134,12 +134,34 @@ option b)
     - test: `ssh -i private-key.pem ec2-user@<nlb_dns_name>`
 
 z7
-- RDS baza free (MySQL), - EC2 konnectija ka bazi( private subnet)
-- sve u secret manager da se cuvaju podaci za konekciju
-        --root pass od baze u secret manager( username i root pass). secret manager - moze da cuva podeljen conneciton string(username, password, host, port)  
-- MySQL konekcija ka bazi
-- Cena za rds
+- [x] RDS baza free (MySQL), EC2 konekcija ka bazi (private subnet)
+    - `aws_db_instance.main`: MySQL 8.0, `db.t3.micro` (Free Tier), 20 GB gp2
+    - `publicly_accessible = false` — samo unutar VPC-a
+    - `aws_db_subnet_group.main`: private subnet + private subnet b (2 AZ-e)
+    - `aws_security_group.rds`: port 3306 samo od EC2 SG (security group chaining)
+- [x] sve u Secrets Manager da se cuvaju podaci za konekciju
+    - `aws_secretsmanager_secret.rds_credentials`: JSON sa username, password, host, port, connection_string
+    - `random_password.db`: 16 karaktera, generisan u Terraformu (nikad u .tf fajlu)
+    - EC2 IAM politika: `ec2_secrets_read` dozvoljava `GetSecretValue` na RDS secret
+    - retrieve: `aws secretsmanager get-secret-value --secret-id <rds-credentials-secret>`
+- [x] MySQL konekcija ka bazi
+    - EC2 `user_data` instalira `mysql` klijent
+    - test: `mysql -h <rds-endpoint> -u admin -p appdb`
+    - output: `rds_endpoint`, `rds_address`, `rds_credentials_secret_arn`, `rds_mysql_command`
+- Cena za RDS: `db.t3.micro` besplatan 750 sati/mesec (12 meseci Free Tier), 20 GB storage
 
+- [x] prikazati secrets/DB podatke na web stranici (PHP app na EC2 + NLB HTTP listener port 80)
+    - `user_data` instalira PHP + php-mysqli, kreira `/var/www/html/db.php`
+    - PHP cita `/etc/db-credentials.json` (fetched iz Secrets Manager pri boot-u)
+    - `db.php` prikazuje konekciju, liste tabela i sadrzaj (LIMIT 100)
+    - NLB listener na portu 80 → TCP forward na EC2 port 80
+    - output: `nlb_web_url` → `http://<nlb_dns>/db.php`
+- [x] AWS CLI cita connection string iz Secrets Manager i cuva ga lokalno
+    - `user_data` koristi `aws secretsmanager get-secret-value` sa retry loop
+    - kredencijali sacuvani u `/etc/db-credentials.json` (za PHP) i `~/.my.cnf` (za mysql CLI)
+    - `chmod 640` / `chmod 600` — samo root/apache/ec2-user mogu da citaju
+    - na EC2: `mysql` radi bez password-a (koristi `.my.cnf` automatski)
+    - nema copy-paste password-a — sve se preuzima iz Secrets Manager
 
 - Containers registry and service
 
@@ -154,3 +176,17 @@ usput predlozi:
 
 -- linux komande, permisije, interfjesiji,permisjije 
 - CNAME, A record, DNS, Route53
+
+
+
+###
+- varijable za kreiranje kako se odredjene resursi kreiraju(ili su ignorisani)
+- tagovi
+- exp. sa upitnicma
+resource "aws_instance" "example" {
+  count = var.create_instance ? 1 : 0
+}
+- varijable za kreiranje resursa, false po defaultu.
+
+
+- netcat (nc),male velicine. nmap
