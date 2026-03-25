@@ -22,6 +22,60 @@ variable "environment" {
   default     = "dev"
 }
 
+variable "create_vpc" {
+  description = "Create only the shared VPC/network layer. Other stacks can also turn this on implicitly."
+  type        = bool
+  default     = false
+}
+
+variable "create_iam" {
+  description = "Create the EC2 IAM role/profile layer. EC2 also turns this on implicitly."
+  type        = bool
+  default     = false
+}
+
+variable "create_nat_gateway" {
+  description = "Create the NAT gateway for private subnet egress. EC2 also turns this on implicitly."
+  type        = bool
+  default     = false
+}
+
+variable "create_s3_bucket" {
+  description = "Create the test S3 bucket."
+  type        = bool
+  default     = false
+}
+
+variable "create_ec2" {
+  description = "Create the EC2 instance stack."
+  type        = bool
+  default     = false
+}
+
+variable "create_rds" {
+  description = "Create the RDS stack and its secret."
+  type        = bool
+  default     = false
+}
+
+variable "create_nlb" {
+  description = "Create the NLB stack for SSH/HTTP access to EC2."
+  type        = bool
+  default     = false
+}
+
+variable "create_vpc_endpoints" {
+  description = "Create SSM interface endpoints and the S3 gateway endpoint."
+  type        = bool
+  default     = false
+}
+
+variable "additional_tags" {
+  description = "Extra tags applied to all AWS resources through provider default_tags."
+  type        = map(string)
+  default     = {}
+}
+
 variable "state_bucket_name" {
   description = "S3 bucket that stores Terraform state (created outside this config)."
   type        = string
@@ -109,4 +163,10 @@ variable "rds_username" {
   description = "Master username for the RDS instance."
   type        = string
   default     = "admin"
+}
+
+variable "rds_allowed_cidr_blocks" {
+  description = "Optional CIDR blocks that may reach MySQL when RDS is created without EC2 SG chaining."
+  type        = list(string)
+  default     = []
 }

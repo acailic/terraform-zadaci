@@ -44,6 +44,27 @@ terraform plan
 terraform apply
 ```
 
+To enable only selected parts of the stack during development, pass the new
+feature flags directly or copy `terraform.tfvars.example`:
+
+```bash
+terraform plan \
+  -var='create_vpc=true' \
+  -var='create_ec2=true' \
+  -var='create_rds=false' \
+  -var='create_nlb=false'
+```
+
+Terraform ternary expressions follow the pattern below. If the flag is `true`,
+the resource gets `count = 1`; if it is `false`, Terraform skips it with
+`count = 0`.
+
+```hcl
+resource "aws_instance" "example" {
+  count = var.create_instance ? 1 : 0
+}
+```
+
 The `bootstrap/` stack provisions `terraform-user`, `TerraformAdminRole`,
 `TerraformS3BackendPolicy`, and the access key for `terraform-user`. The
 repository root provisions the VPC, subnets, EC2, VPC endpoints, Secrets
@@ -64,6 +85,19 @@ Manager secret, and the test S3 bucket.
 - The repo root uses the `terraform` shared profile and assumes
   `TerraformAdminRole`.
 - Do not commit AWS access keys or secrets into the repository.
+
+## Selective creation
+
+- All `create_*` variables default to `false`, so you opt in only to the stacks
+  you want to build.
+- Shared dependencies are derived automatically:
+  `create_ec2=true` also turns on the needed VPC, IAM role/profile, and NAT.
+- `create_nlb` is effective only when `create_ec2=true`, because the NLB
+  attaches the EC2 instance.
+- `create_rds` can run without EC2; if you do that, use
+  `rds_allowed_cidr_blocks` when you want CIDR-based MySQL access.
+- Common tags come from `local.default_tags` and provider `default_tags`; add
+  extra ones with `additional_tags`.
 
 ## Documentation
 
