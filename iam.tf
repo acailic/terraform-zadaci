@@ -3,6 +3,8 @@
 # =============================================================================
 
 resource "aws_iam_role" "ec2_ssm" {
+  count = local.create_iam ? 1 : 0
+
   name = "${local.name_prefix}-ec2-ssm-role"
 
   assume_role_policy = jsonencode({
@@ -18,13 +20,17 @@ resource "aws_iam_role" "ec2_ssm" {
 }
 
 resource "aws_iam_role_policy_attachment" "ec2_ssm" {
-  role       = aws_iam_role.ec2_ssm.name
+  count = local.create_iam ? 1 : 0
+
+  role       = aws_iam_role.ec2_ssm[0].name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
 resource "aws_iam_instance_profile" "ec2_ssm" {
+  count = local.create_iam ? 1 : 0
+
   name = "${local.name_prefix}-ec2-ssm-profile"
-  role = aws_iam_role.ec2_ssm.name
+  role = aws_iam_role.ec2_ssm[0].name
 
   tags = { Name = "${local.name_prefix}-ec2-ssm-profile" }
 }
@@ -32,6 +38,8 @@ resource "aws_iam_instance_profile" "ec2_ssm" {
 # ----- S3 access policy for EC2 -----------------------------------------------
 
 resource "aws_iam_policy" "ec2_s3_access" {
+  count = local.create_iam && local.create_s3_bucket ? 1 : 0
+
   name        = "${local.name_prefix}-ec2-s3-access"
   description = "Allow EC2 instance to read/write the test S3 bucket."
 
@@ -42,7 +50,7 @@ resource "aws_iam_policy" "ec2_s3_access" {
         Sid      = "ListBucket"
         Effect   = "Allow"
         Action   = ["s3:ListBucket"]
-        Resource = [aws_s3_bucket.test.arn]
+        Resource = [aws_s3_bucket.test[0].arn]
       },
       {
         Sid    = "ObjectAccess"
@@ -52,7 +60,7 @@ resource "aws_iam_policy" "ec2_s3_access" {
           "s3:PutObject",
           "s3:DeleteObject",
         ]
-        Resource = ["${aws_s3_bucket.test.arn}/*"]
+        Resource = ["${aws_s3_bucket.test[0].arn}/*"]
       },
     ]
   })
@@ -61,13 +69,17 @@ resource "aws_iam_policy" "ec2_s3_access" {
 }
 
 resource "aws_iam_role_policy_attachment" "ec2_s3_access" {
-  role       = aws_iam_role.ec2_ssm.name
-  policy_arn = aws_iam_policy.ec2_s3_access.arn
+  count = local.create_iam && local.create_s3_bucket ? 1 : 0
+
+  role       = aws_iam_role.ec2_ssm[0].name
+  policy_arn = aws_iam_policy.ec2_s3_access[0].arn
 }
 
 # ----- Secrets Manager read policy for EC2 ------------------------------------
 
 resource "aws_iam_policy" "ec2_secrets_read" {
+  count = local.create_iam && local.create_rds ? 1 : 0
+
   name        = "${local.name_prefix}-ec2-secrets-read"
   description = "Allow EC2 instance to read RDS credentials from Secrets Manager."
 
@@ -81,7 +93,7 @@ resource "aws_iam_policy" "ec2_secrets_read" {
           "secretsmanager:GetSecretValue",
           "secretsmanager:DescribeSecret",
         ]
-        Resource = [aws_secretsmanager_secret.rds_credentials.arn]
+        Resource = [aws_secretsmanager_secret.rds_credentials[0].arn]
       },
     ]
   })
@@ -90,6 +102,8 @@ resource "aws_iam_policy" "ec2_secrets_read" {
 }
 
 resource "aws_iam_role_policy_attachment" "ec2_secrets_read" {
-  role       = aws_iam_role.ec2_ssm.name
-  policy_arn = aws_iam_policy.ec2_secrets_read.arn
+  count = local.create_iam && local.create_rds ? 1 : 0
+
+  role       = aws_iam_role.ec2_ssm[0].name
+  policy_arn = aws_iam_policy.ec2_secrets_read[0].arn
 }

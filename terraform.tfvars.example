@@ -1,0 +1,19 @@
+# Enable only the stack you are currently working on.
+create_vpc           = true
+create_iam           = false
+create_nat_gateway   = false
+create_s3_bucket     = false
+create_ec2           = true
+create_rds           = false
+create_nlb           = false
+create_vpc_endpoints = false
+
+environment = "dev"
+
+additional_tags = {
+  Owner = "aleksandar"
+  Phase = "dev"
+}
+
+# If you create RDS without EC2, you can still open MySQL to selected CIDRs.
+rds_allowed_cidr_blocks = []
