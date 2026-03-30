@@ -76,6 +76,18 @@ variable "create_vpc_endpoints" {
   default     = false
 }
 
+variable "create_dns" {
+  description = "Create Route 53 hosted zone and DNS records for custom domain."
+  type        = bool
+  default     = false
+}
+
+variable "domain_name" {
+  description = "Custom domain name for the Route 53 hosted zone."
+  type        = string
+  default     = "gitstrology.dev"
+}
+
 variable "additional_tags" {
   description = "Extra tags applied to all AWS resources through provider default_tags."
   type        = map(string)
