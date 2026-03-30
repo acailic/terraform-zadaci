@@ -99,13 +99,13 @@ resource "aws_instance" "test" {
   # PHP web app cita taj fajl i prikazuje sadrzaj baze na web stranici.
   user_data = <<-EOF
     #!/bin/bash
-    set -euo pipefail
+    set -xuo pipefail
     yum update -y
-    yum install -y httpd mysql php php-mysqli php-json jq
+    yum install -y httpd mariadb105 php php-mysqli php-json jq
     systemctl start httpd
     systemctl enable httpd
 
-%{if local.create_rds}
+    %{if local.create_rds}
     # --- Fetch RDS credentials from Secrets Manager via AWS CLI ----------------
     # EC2 instance role (ec2_secrets_read policy) allows GetSecretValue.
     # Credentials are saved to a local file — no copy-paste needed.
@@ -239,9 +239,9 @@ resource "aws_instance" "test" {
     <hr><p><a href="/">Back to home</a></p>
     </body></html>
     PHPEOF
-%{else}
+    %{else}
     echo "<h1>Hello from $(hostname -f)</h1><p>RDS stack is disabled for this environment.</p>" > /var/www/html/index.html
-%{endif}
+    %{endif}
 
   EOF
 

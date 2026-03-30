@@ -67,7 +67,7 @@ resource "random_password" "db" {
 
   length           = 16
   special          = true
-  override_special = "!#$%&*()-_=+[]{}<>:?"
+  override_special = "!$%&*()-_=+[]{}<>"
 }
 
 # ----- RDS MySQL instance ----------------------------------------------------
@@ -91,6 +91,7 @@ resource "aws_db_instance" "main" {
   vpc_security_group_ids = [aws_security_group.rds[0].id]
 
   publicly_accessible = false
+  storage_encrypted   = true  # Free — no extra cost, best practice
   multi_az            = false # Dev — jedna AZ je dovoljna
   skip_final_snapshot = true  # Dev — ne cuva snapshot na destroy
   deletion_protection = false

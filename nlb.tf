@@ -73,6 +73,8 @@ resource "aws_lb_listener" "ssh" {
 
 # ----- NLB Target Group (TCP port 80) — web app --------------------------------
 # TCP target group za HTTP web app. NLB prosledjuje TCP konekciju na port 80.
+# NOTE: Ovi resursi se kreiraju kad god je NLB ukljucen, cak i bez RDS-a.
+# Bez create_rds = true, web app prikazuje "RDS stack is disabled" poruku.
 
 resource "aws_lb_target_group" "web" {
   count = local.create_nlb ? 1 : 0
