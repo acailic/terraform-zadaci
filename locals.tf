@@ -16,6 +16,7 @@ locals {
   # create_nlb           = var.create_nlb && local.create_ec2
   create_nlb           = false
   create_alb           = var.create_alb && local.create_ec2
+  create_dns           = var.create_dns && local.create_alb
   create_vpc_endpoints = var.create_vpc_endpoints
 
   # Kad je ALB ukljucen, kreiramo 2 EC2 instance u razlicitim AZ-ovima za HA
