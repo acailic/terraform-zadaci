@@ -107,6 +107,7 @@ Manager secret, and the test S3 bucket.
 - [Provider Versioning Guide](docs/guides/provider-versioning.md) - Terraform provider version management
 - [Zadatak 1 - IAM Setup](docs/tasks/zadatak1/README.md) - IAM user, role, and S3 backend configuration
 - [Zadatak 2 - EC2 Access](docs/tasks/zadatak2/README.md) - SSH key pair, security group, and SSM Session Manager
+- [Zadatak 9 - ALB HA Failover](docs/tasks/zadatak9/README.md) - ALB sa 2 targeta, failover test i learning summary
 - [Learning: NAT, S3, SSH Tunnel](docs/learning/05-nat-s3-ssh-tunnel.md) - NAT gateway, S3 access from EC2, SSH over SSM tunnel
 
 ## Current notes
@@ -188,6 +189,7 @@ z7
     - `user_data` instalira PHP + php-mysqli, kreira `/var/www/html/db.php`
     - PHP cita `/etc/db-credentials.json` (fetched iz Secrets Manager pri boot-u)
     - `db.php` prikazuje konekciju, liste tabela i sadrzaj (LIMIT 100)
+    --- [] probati init sql usera i seme prilikom kreiranje baze.
     - NLB listener na portu 80 → TCP forward na EC2 port 80
     - output: `nlb_web_url` → `http://<nlb_dns>/db.php`
 - [x] AWS CLI cita connection string iz Secrets Manager i cuva ga lokalno
@@ -197,9 +199,22 @@ z7
     - na EC2: `mysql` radi bez password-a (koristi `.my.cnf` automatski)
     - nema copy-paste password-a — sve se preuzima iz Secrets Manager
 
+
+
+z9
+- [x] ALB HA scenario sa 2 targeta
+- [x] Scenario testiranja: ugasiti jednu EC2 instancu i potvrditi failover; zatim ugasiti obe i potvrditi da ALB ostaje bez healthy targeta
+
+moj dns.(
+- DNS , route53 public hosting zona (naplacuje se zona)
+- rucno stetovati 2 ns recorda.()
+- NS record, podesavanje svih na AWS Nalogu. umesto dinamik ALB domena staviti custom domain.
+za citatti: ECR , ECS
 - Containers registry and service
 
 
+- php da povuce se sa S3, menja se kod na s3
+- ili druga opcija, github repo da se cita sa key readonly, i da se prebaci u direktorijum da cita php sa instance
 -----
 - da iskljucim asi
 

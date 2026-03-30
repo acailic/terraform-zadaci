@@ -8,25 +8,39 @@ resource "aws_security_group" "web" {
   count = local.create_ec2 ? 1 : 0
 
   vpc_id      = aws_vpc.test[0].id
-  description = "Allow SSH and HTTP inbound for NLB (NLB has no SG - passes client IP directly)"
+  description = "Allow SSH and HTTP inbound for EC2 instances"
 
-  # NLB radi na Layer 4 (TCP) i NEMA security group.
-  # NLB propušta originalni client source IP do EC2.
-  # Zato EC2 SG mora da dozvoli SSH od CIDR blokova, ne od SG-a.
+  # SSH pristup — za SSM Session Manager ili direktan SSH
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = var.allowed_cidr_blocks
-    description = "SSH via NLB (client IP passthrough)"
+    description = "SSH access"
   }
 
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = var.allowed_cidr_blocks
-    description = "HTTP via NLB for web app"
+  # HTTP sa ALB-om: samo ALB SG sme da salje HTTP ka EC2
+  dynamic "ingress" {
+    for_each = local.create_alb ? [1] : []
+    content {
+      from_port       = 80
+      to_port         = 80
+      protocol        = "tcp"
+      security_groups = [aws_security_group.alb[0].id]
+      description     = "HTTP from ALB only"
+    }
+  }
+
+  # HTTP bez ALB-a: direktan pristup (standalone EC2)
+  dynamic "ingress" {
+    for_each = local.create_alb ? [] : [1]
+    content {
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      cidr_blocks = var.allowed_cidr_blocks
+      description = "HTTP direct access"
+    }
   }
 
   egress {
@@ -84,11 +98,12 @@ resource "aws_secretsmanager_secret_version" "ssh_private_key" {
 # ----- EC2 instance ---------------------------------------------------------
 
 resource "aws_instance" "test" {
-  count = local.create_ec2 ? 1 : 0
+  count = local.ec2_instance_count
 
-  ami                    = var.ami_id
-  instance_type          = var.instance_type
-  subnet_id              = aws_subnet.private[0].id
+  ami           = var.ami_id
+  instance_type = var.instance_type
+  # Kad ALB: instance 0 ide u private (us-east-1a), instance 1 u private_b (us-east-1b)
+  subnet_id              = count.index == 0 ? aws_subnet.private[0].id : aws_subnet.private_b[0].id
   vpc_security_group_ids = [aws_security_group.web[0].id]
   key_name               = aws_key_pair.main[0].key_name
   iam_instance_profile   = aws_iam_instance_profile.ec2_ssm[0].name
@@ -245,5 +260,5 @@ resource "aws_instance" "test" {
 
   EOF
 
-  tags = { Name = "${local.name_prefix}-ec2" }
+  tags = { Name = "${local.name_prefix}-ec2-${count.index + 1}" }
 }

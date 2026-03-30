@@ -64,6 +64,12 @@ variable "create_nlb" {
   default     = false
 }
 
+variable "create_alb" {
+  description = "Create the ALB stack with 2 EC2 instances for high availability web access."
+  type        = bool
+  default     = false
+}
+
 variable "create_vpc_endpoints" {
   description = "Create SSM interface endpoints and the S3 gateway endpoint."
   type        = bool

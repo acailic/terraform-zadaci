@@ -6,13 +6,25 @@ output "test_vpc_id" {
   value = try(aws_vpc.test[0].id, null)
 }
 
+# Scalar outputs — backward compatible with existing scripts (05-commands.sh, etc.)
 output "test_ec2_instance_id" {
   value = try(aws_instance.test[0].id, null)
 }
 
 output "test_ec2_private_ip" {
-  description = "Private IP of the EC2 instance in the private subnet."
+  description = "Private IP of the first EC2 instance in the private subnet."
   value       = try(aws_instance.test[0].private_ip, null)
+}
+
+# List outputs — all EC2 instances (1 or 2 depending on ALB)
+output "test_ec2_instance_ids" {
+  description = "IDs of all EC2 instances."
+  value       = aws_instance.test[*].id
+}
+
+output "test_ec2_private_ips" {
+  description = "Private IPs of all EC2 instances."
+  value       = aws_instance.test[*].private_ip
 }
 
 output "internet_gateway_id" {
@@ -63,30 +75,32 @@ output "s3_gateway_endpoint_id" {
   value       = try(aws_vpc_endpoint.s3[0].id, null)
 }
 
-# ALB outputs (zakomentarisan — option b: NLB)
-# output "alb_dns_name" {
-#   description = "Public DNS of the ALB — open this in browser to see your web server."
-#   value       = aws_lb.main.dns_name
-# }
-#
-# output "alb_url" {
-#   description = "Full URL to access the web server via ALB."
-#   value       = "http://${aws_lb.main.dns_name}"
-# }
+# ----- ALB outputs -----------------------------------------------------------
 
+output "alb_dns_name" {
+  description = "Public DNS of the ALB — open this in browser to see your web server."
+  value       = try(aws_lb.alb[0].dns_name, null)
+}
+
+output "alb_web_url" {
+  description = "Web app URL via ALB — points to /db.php when RDS is active, otherwise /."
+  value       = try("http://${aws_lb.alb[0].dns_name}${var.create_rds ? "/db.php" : "/"}", null)
+}
+
+# NLB outputs — hardcoded null while NLB is commented out (backward compatible)
 output "nlb_dns_name" {
-  description = "Public DNS of the NLB — use for SSH: ssh -i key ec2-user@<nlb_dns>"
-  value       = try(aws_lb.nlb[0].dns_name, null)
+  description = "Public DNS of the NLB (NLB currently disabled — using ALB)."
+  value       = null
 }
 
 output "nlb_ssh_command" {
-  description = "SSH command via NLB (retrieve key from Secrets Manager first)."
-  value       = try("ssh -i private-key.pem ec2-user@${aws_lb.nlb[0].dns_name}", null)
+  description = "SSH command via NLB (NLB currently disabled — using ALB)."
+  value       = null
 }
 
 output "nlb_web_url" {
-  description = "Web app URL via NLB — open in browser to see DB viewer."
-  value       = try("http://${aws_lb.nlb[0].dns_name}/db.php", null)
+  description = "Web app URL via NLB (NLB currently disabled — using ALB)."
+  value       = null
 }
 
 # ----- RDS outputs -----------------------------------------------------------
