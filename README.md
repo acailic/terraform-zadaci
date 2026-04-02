@@ -210,7 +210,14 @@ moj dns.(
 - rucno stetovati 2 ns recorda.()
 - NS record, podesavanje svih na AWS Nalogu. umesto dinamik ALB domena staviti custom domain.
 za citatti: ECR , ECS
+
+
 - Containers registry and service
+
+
+[] claudwatch za ec2 instance-a. alb grupa da probamo pristup
+[] claudtrail, pracenje logova za kreirianje po requestu .
+[] 
 
 
 - php da povuce se sa S3, menja se kod na s3
@@ -226,7 +233,7 @@ usput predlozi:
 -- linux komande, permisije, interfjesiji,permisjije 
 - CNAME, A record, DNS, Route53
 
-
+- lambde. claudwatch.
 
 ###
 - varijable za kreiranje kako se odredjene resursi kreiraju(ili su ignorisani)
