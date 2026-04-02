@@ -44,6 +44,27 @@ terraform plan
 terraform apply
 ```
 
+To enable only selected parts of the stack during development, pass the new
+feature flags directly or copy `terraform.tfvars.example`:
+
+```bash
+terraform plan \
+  -var='create_vpc=true' \
+  -var='create_ec2=true' \
+  -var='create_rds=false' \
+  -var='create_nlb=false'
+```
+
+Terraform ternary expressions follow the pattern below. If the flag is `true`,
+the resource gets `count = 1`; if it is `false`, Terraform skips it with
+`count = 0`.
+
+```hcl
+resource "aws_instance" "example" {
+  count = var.create_instance ? 1 : 0
+}
+```
+
 The `bootstrap/` stack provisions `terraform-user`, `TerraformAdminRole`,
 `TerraformS3BackendPolicy`, and the access key for `terraform-user`. The
 repository root provisions the VPC, subnets, EC2, VPC endpoints, Secrets
@@ -65,6 +86,19 @@ Manager secret, and the test S3 bucket.
   `TerraformAdminRole`.
 - Do not commit AWS access keys or secrets into the repository.
 
+## Selective creation
+
+- All `create_*` variables default to `false`, so you opt in only to the stacks
+  you want to build.
+- Shared dependencies are derived automatically:
+  `create_ec2=true` also turns on the needed VPC, IAM role/profile, and NAT.
+- `create_nlb` is effective only when `create_ec2=true`, because the NLB
+  attaches the EC2 instance.
+- `create_rds` can run without EC2; if you do that, use
+  `rds_allowed_cidr_blocks` when you want CIDR-based MySQL access.
+- Common tags come from `local.default_tags` and provider `default_tags`; add
+  extra ones with `additional_tags`.
+
 ## Documentation
 
 - [Bootstrap Stack](bootstrap/README.md) - IAM bootstrap workflow
@@ -73,6 +107,7 @@ Manager secret, and the test S3 bucket.
 - [Provider Versioning Guide](docs/guides/provider-versioning.md) - Terraform provider version management
 - [Zadatak 1 - IAM Setup](docs/tasks/zadatak1/README.md) - IAM user, role, and S3 backend configuration
 - [Zadatak 2 - EC2 Access](docs/tasks/zadatak2/README.md) - SSH key pair, security group, and SSM Session Manager
+- [Zadatak 9 - ALB HA Failover](docs/tasks/zadatak9/README.md) - ALB sa 2 targeta, failover test i learning summary
 - [Learning: NAT, S3, SSH Tunnel](docs/learning/05-nat-s3-ssh-tunnel.md) - NAT gateway, S3 access from EC2, SSH over SSM tunnel
 
 ## Current notes
@@ -154,6 +189,7 @@ z7
     - `user_data` instalira PHP + php-mysqli, kreira `/var/www/html/db.php`
     - PHP cita `/etc/db-credentials.json` (fetched iz Secrets Manager pri boot-u)
     - `db.php` prikazuje konekciju, liste tabela i sadrzaj (LIMIT 100)
+    --- [] probati init sql usera i seme prilikom kreiranje baze.
     - NLB listener na portu 80 → TCP forward na EC2 port 80
     - output: `nlb_web_url` → `http://<nlb_dns>/db.php`
 - [x] AWS CLI cita connection string iz Secrets Manager i cuva ga lokalno
@@ -163,9 +199,29 @@ z7
     - na EC2: `mysql` radi bez password-a (koristi `.my.cnf` automatski)
     - nema copy-paste password-a — sve se preuzima iz Secrets Manager
 
+
+
+z9
+- [x] ALB HA scenario sa 2 targeta
+- [x] Scenario testiranja: ugasiti jednu EC2 instancu i potvrditi failover; zatim ugasiti obe i potvrditi da ALB ostaje bez healthy targeta
+
+moj dns.(
+- DNS , route53 public hosting zona (naplacuje se zona)
+- rucno stetovati 2 ns recorda.()
+- NS record, podesavanje svih na AWS Nalogu. umesto dinamik ALB domena staviti custom domain.
+za citatti: ECR , ECS
+
+
 - Containers registry and service
 
 
+[] claudwatch za ec2 instance-a. alb grupa da probamo pristup
+[] claudtrail, pracenje logova za kreirianje po requestu .
+[] 
+
+
+- php da povuce se sa S3, menja se kod na s3
+- ili druga opcija, github repo da se cita sa key readonly, i da se prebaci u direktorijum da cita php sa instance
 -----
 - da iskljucim asi
 
@@ -177,7 +233,7 @@ usput predlozi:
 -- linux komande, permisije, interfjesiji,permisjije 
 - CNAME, A record, DNS, Route53
 
-
+- lambde. claudwatch.
 
 ###
 - varijable za kreiranje kako se odredjene resursi kreiraju(ili su ignorisani)
