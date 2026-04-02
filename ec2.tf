@@ -5,26 +5,42 @@
 # ----- Security Group -------------------------------------------------------
 
 resource "aws_security_group" "web" {
-  vpc_id      = aws_vpc.test.id
-  description = "Allow SSH and HTTP inbound for NLB (NLB has no SG - passes client IP directly)"
+  count = local.create_ec2 ? 1 : 0
 
-  # NLB radi na Layer 4 (TCP) i NEMA security group.
-  # NLB propušta originalni client source IP do EC2.
-  # Zato EC2 SG mora da dozvoli SSH od CIDR blokova, ne od SG-a.
+  vpc_id      = aws_vpc.test[0].id
+  description = "Allow SSH and HTTP inbound for EC2 instances"
+
+  # SSH pristup — za SSM Session Manager ili direktan SSH
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = var.allowed_cidr_blocks
-    description = "SSH via NLB (client IP passthrough)"
+    description = "SSH access"
   }
 
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = var.allowed_cidr_blocks
-    description = "HTTP via NLB for web app"
+  # HTTP sa ALB-om: samo ALB SG sme da salje HTTP ka EC2
+  dynamic "ingress" {
+    for_each = local.create_alb ? [1] : []
+    content {
+      from_port       = 80
+      to_port         = 80
+      protocol        = "tcp"
+      security_groups = [aws_security_group.alb[0].id]
+      description     = "HTTP from ALB only"
+    }
+  }
+
+  # HTTP bez ALB-a: direktan pristup (standalone EC2)
+  dynamic "ingress" {
+    for_each = local.create_alb ? [] : [1]
+    content {
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      cidr_blocks = var.allowed_cidr_blocks
+      description = "HTTP direct access"
+    }
   }
 
   egress {
@@ -42,22 +58,30 @@ resource "aws_security_group" "web" {
 # Rotacija kljuceva je bitna — moze se automatizovati sa Lambda funkcijom.
 
 resource "tls_private_key" "main" {
+  count = local.create_ec2 ? 1 : 0
+
   algorithm = "ED25519"
 }
 
 resource "aws_key_pair" "main" {
+  count = local.create_ec2 ? 1 : 0
+
   key_name   = "${local.name_prefix}-key"
-  public_key = tls_private_key.main.public_key_openssh
+  public_key = tls_private_key.main[0].public_key_openssh
 
   tags = { Name = "${local.name_prefix}-key" }
 }
 
 resource "random_id" "secret_suffix" {
+  count = local.create_ec2 || local.create_rds ? 1 : 0
+
   byte_length = 4
 }
 
 resource "aws_secretsmanager_secret" "ssh_private_key" {
-  name                    = "${local.name_prefix}-ssh-private-key-${random_id.secret_suffix.hex}"
+  count = local.create_ec2 ? 1 : 0
+
+  name                    = "${local.name_prefix}-ssh-private-key-${random_id.secret_suffix[0].hex}"
   description             = "SSH private key for EC2 instance access (managed by Terraform)"
   recovery_window_in_days = 0 # Dev environment — allow immediate deletion on destroy
 
@@ -65,19 +89,24 @@ resource "aws_secretsmanager_secret" "ssh_private_key" {
 }
 
 resource "aws_secretsmanager_secret_version" "ssh_private_key" {
-  secret_id     = aws_secretsmanager_secret.ssh_private_key.id
-  secret_string = tls_private_key.main.private_key_openssh
+  count = local.create_ec2 ? 1 : 0
+
+  secret_id     = aws_secretsmanager_secret.ssh_private_key[0].id
+  secret_string = tls_private_key.main[0].private_key_openssh
 }
 
 # ----- EC2 instance ---------------------------------------------------------
 
 resource "aws_instance" "test" {
-  ami                    = var.ami_id
-  instance_type          = var.instance_type
-  subnet_id              = aws_subnet.private.id
-  vpc_security_group_ids = [aws_security_group.web.id]
-  key_name               = aws_key_pair.main.key_name
-  iam_instance_profile   = aws_iam_instance_profile.ec2_ssm.name
+  count = local.ec2_instance_count
+
+  ami           = var.ami_id
+  instance_type = var.instance_type
+  # Kad ALB: instance 0 ide u private (us-east-1a), instance 1 u private_b (us-east-1b)
+  subnet_id              = count.index == 0 ? aws_subnet.private[0].id : aws_subnet.private_b[0].id
+  vpc_security_group_ids = [aws_security_group.web[0].id]
+  key_name               = aws_key_pair.main[0].key_name
+  iam_instance_profile   = aws_iam_instance_profile.ec2_ssm[0].name
 
   # user_data runs on instance launch. The private subnet reaches the internet
   # via the NAT gateway in the public subnet.
@@ -85,17 +114,18 @@ resource "aws_instance" "test" {
   # PHP web app cita taj fajl i prikazuje sadrzaj baze na web stranici.
   user_data = <<-EOF
     #!/bin/bash
-    set -euo pipefail
+    set -xuo pipefail
     yum update -y
-    yum install -y httpd mysql php php-mysqli php-json jq
+    yum install -y httpd mariadb105 php php-mysqli php-json jq
     systemctl start httpd
     systemctl enable httpd
 
+    %{if local.create_rds}
     # --- Fetch RDS credentials from Secrets Manager via AWS CLI ----------------
     # EC2 instance role (ec2_secrets_read policy) allows GetSecretValue.
     # Credentials are saved to a local file — no copy-paste needed.
     REGION="${var.aws_region}"
-    SECRET_ID="${aws_secretsmanager_secret.rds_credentials.name}"
+    SECRET_ID="${aws_secretsmanager_secret.rds_credentials[0].name}"
 
     # Retry loop — Secrets Manager endpoint may take a moment after boot
     for i in $(seq 1 12); do
@@ -224,8 +254,11 @@ resource "aws_instance" "test" {
     <hr><p><a href="/">Back to home</a></p>
     </body></html>
     PHPEOF
+    %{else}
+    echo "<h1>Hello from $(hostname -f)</h1><p>RDS stack is disabled for this environment.</p>" > /var/www/html/index.html
+    %{endif}
 
   EOF
 
-  tags = { Name = "${local.name_prefix}-ec2" }
+  tags = { Name = "${local.name_prefix}-ec2-${count.index + 1}" }
 }
