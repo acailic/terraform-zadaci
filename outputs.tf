@@ -87,6 +87,28 @@ output "alb_web_url" {
   value       = try("http://${aws_lb.alb[0].dns_name}${var.create_rds ? "/db.php" : "/"}", null)
 }
 
+# ----- DNS outputs -----------------------------------------------------------
+
+output "route53_nameservers" {
+  description = "NS servers to configure at your domain registrar for DNS delegation."
+  value       = try(aws_route53_zone.main[0].name_servers, null)
+}
+
+output "route53_zone_id" {
+  description = "Route 53 hosted zone ID."
+  value       = try(aws_route53_zone.main[0].zone_id, null)
+}
+
+output "custom_domain_url" {
+  description = "Web app URL via custom domain (HTTPS when DNS is active)."
+  value       = local.create_dns ? "https://${var.domain_name}" : null
+}
+
+output "acm_certificate_arn" {
+  description = "ARN of the ACM SSL certificate for the custom domain."
+  value       = try(aws_acm_certificate.main[0].arn, null)
+}
+
 # NLB outputs — hardcoded null while NLB is commented out (backward compatible)
 output "nlb_dns_name" {
   description = "Public DNS of the NLB (NLB currently disabled — using ALB)."

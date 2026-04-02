@@ -43,3 +43,55 @@ resource "aws_route53_record" "alb_alias" {
     evaluate_target_health = true
   }
 }
+
+# =============================================================================
+# ACM – SSL/TLS Certificate (besplatan)
+#
+# ACM izdaje certifikat za custom domen. DNS validacija dokazuje vlasnistvo
+# domena — ACM kreira CNAME record u Route 53 i ceka da se pojavi.
+# Certifikat se koristi na ALB HTTPS listeneru (port 443).
+#
+# .dev domeni ZAHTEVAJU HTTPS — browser (Chrome, Firefox) nece otvoriti
+# HTTP verziju jer je .dev na HSTS preload listi.
+# =============================================================================
+
+# ----- ACM Certificate --------------------------------------------------------
+
+resource "aws_acm_certificate" "main" {
+  count = local.create_dns ? 1 : 0
+
+  domain_name       = var.domain_name
+  validation_method = "DNS"
+
+  tags = { Name = "${local.name_prefix}-acm-cert" }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# ----- DNS Validation Record --------------------------------------------------
+# ACM zahteva CNAME record u Route 53 kao dokaz vlasnistva domena.
+# Koristimo count umesto for_each jer domain_validation_options nije poznat pre apply-a.
+
+resource "aws_route53_record" "acm_validation" {
+  count = local.create_dns ? 1 : 0
+
+  zone_id = aws_route53_zone.main[0].zone_id
+  name    = tolist(aws_acm_certificate.main[0].domain_validation_options)[0].resource_record_name
+  type    = tolist(aws_acm_certificate.main[0].domain_validation_options)[0].resource_record_type
+  ttl     = 60
+  records = [tolist(aws_acm_certificate.main[0].domain_validation_options)[0].resource_record_value]
+
+  allow_overwrite = true
+}
+
+# ----- ACM Validation Wait ----------------------------------------------------
+# Ceka da ACM potvrdi certifikat (obicno 2-5 minuta).
+
+resource "aws_acm_certificate_validation" "main" {
+  count = local.create_dns ? 1 : 0
+
+  certificate_arn         = aws_acm_certificate.main[0].arn
+  validation_record_fqdns = [aws_route53_record.acm_validation[0].fqdn]
+}

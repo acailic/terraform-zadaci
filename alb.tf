@@ -33,6 +33,14 @@ resource "aws_security_group" "alb" {
     description = "HTTP from internet"
   }
 
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTPS from internet"
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -106,6 +114,40 @@ resource "aws_lb_listener" "alb_http" {
   load_balancer_arn = aws_lb.alb[0].arn
   port              = 80
   protocol          = "HTTP"
+
+  dynamic "default_action" {
+    for_each = local.create_dns ? [] : [1]
+    content {
+      type             = "forward"
+      target_group_arn = aws_lb_target_group.alb_web[0].arn
+    }
+  }
+
+  dynamic "default_action" {
+    for_each = local.create_dns ? [1] : []
+    content {
+      type = "redirect"
+      redirect {
+        port        = "443"
+        protocol    = "HTTPS"
+        status_code = "HTTP_301"
+      }
+    }
+  }
+}
+
+# ----- ALB HTTPS Listener (port 443) -----------------------------------------
+# Slusa na ALB-u na portu 443 sa ACM certifikatom i prosledjuje na Target Group.
+# Kreira se samo kad je DNS aktivan (jer ACM cert zavisi od Route 53).
+
+resource "aws_lb_listener" "alb_https" {
+  count = local.create_dns ? 1 : 0
+
+  load_balancer_arn = aws_lb.alb[0].arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-2016-08"
+  certificate_arn   = aws_acm_certificate_validation.main[0].certificate_arn
 
   default_action {
     type             = "forward"
