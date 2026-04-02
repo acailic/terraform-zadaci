@@ -30,9 +30,17 @@ override.tf.json
 .DS_Store
 **/.DS_Store
 .claude
+
+# Local tool state
+.omc/
+
 # IDE / editor files
 .idea/
 *.iml
 .vscode/
+
+# Generated test output
+test-results/
+
 docs/*
 docs/zadatak1/*
